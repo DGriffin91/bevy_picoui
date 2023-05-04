@@ -41,7 +41,7 @@ struct ExampleView {
 /// (0.0, 0.0, -1.0) is linear distance of 1.0 in front of the camera's view relative to the camera's rotation
 /// (0.0, 1.0, 0.0) is linear distance of 1.0 above the camera's view relative to the camera's rotation
 
-/// Clip space or NDC (normalized device coordinate)
+/// NDC (normalized device coordinate)
 /// https://www.w3.org/TR/webgpu/#coordinate-systems
 /// (-1.0, -1.0) in NDC is located at the bottom-left corner of NDC
 /// (1.0, 1.0) in NDC is located at the top-right corner of NDC
@@ -63,16 +63,16 @@ fn position_world_to_view(world_pos: vec3<f32>) -> vec3<f32> {
     return view_pos.xyz;
 }
 
-/// Convert clip space position to world space
-fn position_clip_to_world(clip_pos: vec3<f32>) -> vec3<f32> {
-    let world_pos = view.inverse_view_proj * vec4(clip_pos, 1.0);
+/// Convert ndc space position to world space
+fn position_ndc_to_world(ndc_pos: vec3<f32>) -> vec3<f32> {
+    let world_pos = view.inverse_view_proj * vec4(ndc_pos, 1.0);
     return world_pos.xyz / world_pos.w;
 }
 
-/// Convert world space position to clip space
-fn position_world_to_clip(world_pos: vec3<f32>) -> vec3<f32> {
-    let clip_pos = view.view_proj * vec4(world_pos, 1.0);
-    return clip_pos.xyz / clip_pos.w;
+/// Convert world space position to ndc space
+fn position_world_to_ndc(world_pos: vec3<f32>) -> vec3<f32> {
+    let ndc_pos = view.view_proj * vec4(world_pos, 1.0);
+    return ndc_pos.xyz / ndc_pos.w;
 }
 
 /// Retrieve the camera near clipping plane
@@ -80,17 +80,17 @@ fn camera_near() -> f32 {
     return view.projection[3][2];
 }
 
-/// Convert clip space depth to linear world space
-fn depth_clip_to_linear(clip_depth: f32) -> f32 {
-    return camera_near() / clip_depth;
+/// Convert ndc space depth to linear world space
+fn depth_ndc_to_linear(ndc_depth: f32) -> f32 {
+    return camera_near() / ndc_depth;
 }
 
-/// Convert clip space xy coordinate [-1.0 .. 1.0] to uv [0.0 .. 1.0]
-fn clip_to_uv(clip: vec2<f32>) -> vec2<f32> {
-    return clip * vec2(0.5, -0.5) + vec2(0.5, 0.5);
+/// Convert ndc space xy coordinate [-1.0 .. 1.0] to uv [0.0 .. 1.0]
+fn ndc_to_uv(ndc: vec2<f32>) -> vec2<f32> {
+    return ndc * vec2(0.5, -0.5) + vec2(0.5, 0.5);
 }
 
-/// Convert uv [0.0 .. 1.0] coordinate to clip space xy [-1.0 .. 1.0]
-fn uv_to_clip(uv: vec2<f32>) -> vec2<f32> {
+/// Convert uv [0.0 .. 1.0] coordinate to ndc space xy [-1.0 .. 1.0]
+fn uv_to_ndc(uv: vec2<f32>) -> vec2<f32> {
     return (uv - vec2(0.5)) * vec2(2.0, -2.0);
 }
