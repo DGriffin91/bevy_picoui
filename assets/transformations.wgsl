@@ -51,25 +51,25 @@ struct ExampleView {
 /// 0.0, 0.0 is the top left
 /// 1.0, 1.0 is the bottom right
 
-/// Convert view space position to world space
+/// Convert a view space position to world space
 fn position_view_to_world(view_pos: vec3<f32>) -> vec3<f32> {
-    let world_pos = view.inverse_view * vec4(view_pos, 1.0);
+    let world_pos = view.view * vec4(view_pos, 1.0);
     return world_pos.xyz;
 }
 
-/// Convert world space position to view space
+/// Convert a world space position to view space
 fn position_world_to_view(world_pos: vec3<f32>) -> vec3<f32> {
-    let view_pos = view.view * vec4(world_pos, 1.0);
+    let view_pos = view.inverse_view * vec4(world_pos, 1.0);
     return view_pos.xyz;
 }
 
-/// Convert ndc space position to world space
+/// Convert a ndc space position to world space
 fn position_ndc_to_world(ndc_pos: vec3<f32>) -> vec3<f32> {
     let world_pos = view.inverse_view_proj * vec4(ndc_pos, 1.0);
     return world_pos.xyz / world_pos.w;
 }
 
-/// Convert world space position to ndc space
+/// Convert a world space position to ndc space
 fn position_world_to_ndc(world_pos: vec3<f32>) -> vec3<f32> {
     let ndc_pos = view.view_proj * vec4(world_pos, 1.0);
     return ndc_pos.xyz / ndc_pos.w;

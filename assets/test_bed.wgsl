@@ -35,5 +35,6 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
     var N = normalize(in.world_normal);
     var V = normalize(view.world_position.xyz - in.world_position.xyz);
 
-    return vec4(N, 1.0);
+    return vec4(-vec3(position_world_to_view(vec3(in.world_position.xyz)).z), 1.0);
+    //return vec4(in.world_position.xyz, 1.0);
 }
