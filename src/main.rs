@@ -36,8 +36,19 @@ fn setup(
     // cube
     commands.spawn(MaterialMeshBundle {
         mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-        material,
+        material: material.clone(),
         transform: Transform::from_xyz(0.0, 0.5, 0.0),
+        ..default()
+    });
+
+    commands.spawn(MaterialMeshBundle {
+        mesh: meshes.add(Mesh::from(shape::UVSphere {
+            radius: 1.0,
+            sectors: 512,
+            stacks: 512,
+        })),
+        material,
+        transform: Transform::from_xyz(0.0, 2.0, 0.0),
         ..default()
     });
 

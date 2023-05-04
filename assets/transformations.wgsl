@@ -32,9 +32,48 @@ struct ExampleView {
     color_grading: ColorGrading,
 };
 
+
+/// World space
+/// +y is up
+
+/// View space
+/// -z is forward, +x is right, +y is up
+/// (0.0, 0.0, -1.0) is linear distance of 1.0 in front of the camera's view relative to the camera's rotation
+/// (0.0, 1.0, 0.0) is linear distance of 1.0 above the camera's view relative to the camera's rotation
+
 /// Clip space or NDC (normalized device coordinate)
 /// https://www.w3.org/TR/webgpu/#coordinate-systems
-/// point(-1.0, -1.0) in NDC is located at the bottom-left corner of NDC
+/// (-1.0, -1.0) in NDC is located at the bottom-left corner of NDC
+/// (1.0, 1.0) in NDC is located at the top-right corner of NDC
+/// Z is depth where 1.0 is near clipping plane, and 0.0 is inf far away
+
+/// UV space
+/// 0.0, 0.0 is the top left
+/// 1.0, 1.0 is the bottom right
+
+/// Convert view space position to world space
+fn position_view_to_world(view_pos: vec3<f32>) -> vec3<f32> {
+    let world_pos = view.inverse_view * vec4(view_pos, 1.0);
+    return world_pos.xyz;
+}
+
+/// Convert world space position to view space
+fn position_world_to_view(world_pos: vec3<f32>) -> vec3<f32> {
+    let view_pos = view.view * vec4(world_pos, 1.0);
+    return view_pos.xyz;
+}
+
+/// Convert clip space position to world space
+fn position_clip_to_world(clip_pos: vec3<f32>) -> vec3<f32> {
+    let world_pos = view.inverse_view_proj * vec4(clip_pos, 1.0);
+    return world_pos.xyz / world_pos.w;
+}
+
+/// Convert world space position to clip space
+fn position_world_to_clip(world_pos: vec3<f32>) -> vec3<f32> {
+    let clip_pos = view.view_proj * vec4(world_pos, 1.0);
+    return clip_pos.xyz / clip_pos.w;
+}
 
 /// Retrieve the camera near clipping plane
 fn camera_near() -> f32 {
@@ -44,18 +83,6 @@ fn camera_near() -> f32 {
 /// Convert clip space depth to linear world space
 fn depth_clip_to_linear(clip_depth: f32) -> f32 {
     return camera_near() / clip_depth;
-}
-
-/// Convert clip space position to world space
-fn pos_clip_to_world(clip_pos: vec3<f32>) -> vec3<f32> {
-    let world_pos = view.inverse_view_proj * vec4(clip_pos, 1.0);
-    return world_pos.xyz / world_pos.w;
-}
-
-/// Convert world space position to clip space
-fn pos_world_to_clip(world_pos: vec3<f32>) -> vec3<f32> {
-    let clip_pos = view.view_proj * vec4(world_pos, 1.0);
-    return clip_pos.xyz / clip_pos.w;
 }
 
 /// Convert clip space xy coordinate [-1.0 .. 1.0] to uv [0.0 .. 1.0]
