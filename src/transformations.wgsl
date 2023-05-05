@@ -59,40 +59,21 @@ struct ExampleView {
 /// 0.0, 0.0 is the top left
 /// 1.0, 1.0 is the bottom right
 
+
+// -----------------
+// TO WORLD --------
+// -----------------
+
 /// Convert a view space position to world space
 fn position_view_to_world(view_pos: vec3<f32>) -> vec3<f32> {
     let world_pos = view.view * vec4(view_pos, 1.0);
     return world_pos.xyz;
 }
 
-/// Convert a view space direction to world space
-fn direction_view_to_world(view_dir: vec3<f32>) -> vec3<f32> {
-    let world_dir = view.view * vec4(view_dir, 0.0);
-    return world_dir.xyz;
-}
-
-/// Convert a world space position to view space
-fn position_world_to_view(world_pos: vec3<f32>) -> vec3<f32> {
-    let view_pos = view.inverse_view * vec4(world_pos, 1.0);
-    return view_pos.xyz;
-}
-
-/// Convert a world space direction to view space
-fn direction_world_to_view(world_dir: vec3<f32>) -> vec3<f32> {
-    let view_dir = view.inverse_view * vec4(world_dir, 0.0);
-    return view_dir.xyz;
-}
-
-/// Convert a ndc space position to view space
-fn position_ndc_to_view(ndc_pos: vec3<f32>) -> vec3<f32> {
-    let view_pos = view.inverse_projection * vec4(ndc_pos, 1.0);
-    return view_pos.xyz / view_pos.w;
-}
-
-/// Convert a view space position to ndc space
-fn position_view_to_ndc(view_pos: vec3<f32>) -> vec3<f32> {
-    let ndc_pos = view.projection * vec4(view_pos, 1.0);
-    return ndc_pos.xyz / ndc_pos.w;
+/// Convert a clip space position to world space
+fn position_clip_to_world(clip_pos: vec4<f32>) -> vec3<f32> {
+    let world_pos = view.inverse_view_proj * clip_pos;
+    return world_pos.xyz;
 }
 
 /// Convert a ndc space position to world space
@@ -101,35 +82,96 @@ fn position_ndc_to_world(ndc_pos: vec3<f32>) -> vec3<f32> {
     return world_pos.xyz / world_pos.w;
 }
 
+/// Convert a view space direction to world space
+fn direction_view_to_world(view_dir: vec3<f32>) -> vec3<f32> {
+    let world_dir = view.view * vec4(view_dir, 0.0);
+    return world_dir.xyz;
+}
+
+/// Convert a clip space direction to world space
+fn direction_clip_to_world(clip_dir: vec4<f32>) -> vec3<f32> {
+    let world_dir = view.inverse_view_proj * clip_dir;
+    return world_dir.xyz;
+}
+
+// -----------------
+// TO VIEW ---------
+// -----------------
+
+/// Convert a world space position to view space
+fn position_world_to_view(world_pos: vec3<f32>) -> vec3<f32> {
+    let view_pos = view.inverse_view * vec4(world_pos, 1.0);
+    return view_pos.xyz;
+}
+
+/// Convert a clip space position to view space
+fn position_clip_to_view(clip_pos: vec4<f32>) -> vec3<f32> {
+    let view_pos = view.inverse_projection * clip_pos;
+    return view_pos.xyz / view_pos.w;
+}
+
+/// Convert a ndc space position to view space
+fn position_ndc_to_view(ndc_pos: vec3<f32>) -> vec3<f32> {
+    let view_pos = view.inverse_projection * vec4(ndc_pos, 1.0);
+    return view_pos.xyz / view_pos.w;
+}
+
+/// Convert a world space direction to view space
+fn direction_world_to_view(world_dir: vec3<f32>) -> vec3<f32> {
+    let view_dir = view.inverse_view * vec4(world_dir, 0.0);
+    return view_dir.xyz;
+}
+
+/// Convert a clip space direction to view space
+fn direction_clip_to_view(clip_dir: vec4<f32>) -> vec3<f32> {
+    let view_dir = view.inverse_projection * clip_dir;
+    return view_dir.xyz;
+}
+
+// -----------------
+// TO CLIP ---------
+// -----------------
+
+/// Convert a world space position to clip space
+fn position_world_to_clip(world_pos: vec3<f32>) -> vec4<f32> {
+    let clip_pos = view.view_proj * vec4(world_pos, 1.0);
+    return clip_pos;
+}
+
+/// Convert a view space position to clip space
+fn position_view_to_clip(view_pos: vec3<f32>) -> vec4<f32> {
+    let clip_pos = view.projection * vec4(view_pos, 1.0);
+    return clip_pos;
+}
+
+/// Convert a world space direction to clip space
+fn direction_world_to_clip(world_dir: vec3<f32>) -> vec4<f32> {
+    let clip_dir = view.view_proj * vec4(world_dir, 0.0);
+    return clip_dir;
+}
+
+/// Convert a view space direction to clip space
+fn direction_view_to_clip(view_dir: vec3<f32>) -> vec4<f32> {
+    let clip_dir = view.projection * vec4(view_dir, 0.0);
+    return clip_dir;
+}
+
+// -----------------
+// TO NDC ----------
+// -----------------
+
 /// Convert a world space position to ndc space
 fn position_world_to_ndc(world_pos: vec3<f32>) -> vec3<f32> {
     let ndc_pos = view.view_proj * vec4(world_pos, 1.0);
     return ndc_pos.xyz / ndc_pos.w;
 }
 
-/// TODO incorrect - Convert a clip space direction to world space
-fn direction_clip_to_world(clip_dir: vec4<f32>) -> vec3<f32> {
-    let world_dir = view.inverse_view_proj * clip_dir;
-    return world_dir.xyz / world_dir.w;
+/// Convert a view space position to ndc space
+fn position_view_to_ndc(view_pos: vec3<f32>) -> vec3<f32> {
+    let ndc_pos = view.projection * vec4(view_pos, 1.0);
+    return ndc_pos.xyz / ndc_pos.w;
 }
 
-/// TODO incorrect - Convert a world space direction to clip space
-fn direction_world_to_clip(world_dir: vec3<f32>) -> vec4<f32> {
-    let clip_dir = view.view_proj * vec4(world_dir, 0.0);
-    return clip_dir;
-}
-
-/// TODO incorrect - Convert a ndc space direction to world space
-fn direction_ndc_to_world(ndc_dir: vec3<f32>) -> vec3<f32> {
-    let world_dir = view.inverse_view_proj * vec4(ndc_dir, 0.0);
-    return world_dir.xyz / world_dir.w;
-}
-
-/// TODO incorrect - Convert a world space direction to ndc space
-fn direction_world_to_ndc(world_dir: vec3<f32>) -> vec3<f32> {
-    let ndc_dir = view.view_proj * vec4(world_dir, 0.0);
-    return ndc_dir.xyz / ndc_dir.w;
-}
 
 /// Retrieve the camera near clipping plane
 fn camera_near() -> f32 {
