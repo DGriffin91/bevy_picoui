@@ -5,6 +5,7 @@ use bevy::{
 };
 
 use bevy_basic_camera::{CameraController, CameraControllerPlugin};
+use bevy_coordinate_systems::CoordinateTransformationsPlugin;
 
 fn main() {
     App::new()
@@ -14,6 +15,7 @@ fn main() {
             ..default()
         }))
         .add_plugin(CameraControllerPlugin)
+        .add_plugin(CoordinateTransformationsPlugin)
         .add_plugin(MaterialPlugin::<TestMaterial>::default())
         .add_startup_system(setup)
         .run();
@@ -30,6 +32,7 @@ fn setup(
     commands.spawn(MaterialMeshBundle {
         mesh: meshes.add(shape::Plane::from_size(5.0).into()),
         material: material.clone(),
+        transform: Transform::from_xyz(0.0, 0.0, 0.0),
         ..default()
     });
 
@@ -88,5 +91,5 @@ impl Material for TestMaterial {
 }
 
 #[derive(AsBindGroup, Debug, Clone, TypeUuid)]
-#[uuid = "e17f6ffe-1842-4822-8926-e0ed174294c8"]
+#[uuid = "e27f6ffe-1842-4822-8926-e0ed174294c8"]
 pub struct TestMaterial {}

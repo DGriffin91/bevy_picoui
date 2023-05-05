@@ -1,3 +1,5 @@
+#define_import_path bevy_coordinate_systems::transformations
+
 // Relevant sources.
 // View types:
 // https://github.com/bevyengine/bevy/blob/v0.10.1/crates/bevy_render/src/view/view.wgsl
@@ -7,21 +9,27 @@
 // Same components as View, just renamed to avoid conflict while keeping nice syntax highlighting 
 struct ExampleView {
     // Camera projection * inverse_view
+    // view to clip
     view_proj: mat4x4<f32>,
 
     // Camera view * inverse_projection
+    // clip to world
     inverse_view_proj: mat4x4<f32>,
 
     // Camera view
+    // view to world
     view: mat4x4<f32>,
 
     // Camera inverse_view
+    // world to view
     inverse_view: mat4x4<f32>,
 
     // Camera projection
+    // view to clip
     projection: mat4x4<f32>,
 
     // Camera inverse_projection
+    // clip to view
     inverse_projection: mat4x4<f32>,
 
     // Camera world_position
@@ -57,10 +65,34 @@ fn position_view_to_world(view_pos: vec3<f32>) -> vec3<f32> {
     return world_pos.xyz;
 }
 
+/// Convert a view space direction to world space
+fn direction_view_to_world(view_dir: vec3<f32>) -> vec3<f32> {
+    let world_dir = view.view * vec4(view_dir, 0.0);
+    return world_dir.xyz;
+}
+
 /// Convert a world space position to view space
 fn position_world_to_view(world_pos: vec3<f32>) -> vec3<f32> {
     let view_pos = view.inverse_view * vec4(world_pos, 1.0);
     return view_pos.xyz;
+}
+
+/// Convert a world space direction to view space
+fn direction_world_to_view(world_dir: vec3<f32>) -> vec3<f32> {
+    let view_dir = view.inverse_view * vec4(world_dir, 0.0);
+    return view_dir.xyz;
+}
+
+/// Convert a ndc space position to view space
+fn position_ndc_to_view(ndc_pos: vec3<f32>) -> vec3<f32> {
+    let view_pos = view.inverse_projection * vec4(ndc_pos, 1.0);
+    return view_pos.xyz / view_pos.w;
+}
+
+/// Convert a view space position to ndc space
+fn position_view_to_ndc(view_pos: vec3<f32>) -> vec3<f32> {
+    let ndc_pos = view.projection * vec4(view_pos, 1.0);
+    return ndc_pos.xyz / ndc_pos.w;
 }
 
 /// Convert a ndc space position to world space
@@ -85,12 +117,28 @@ fn depth_ndc_to_linear(ndc_depth: f32) -> f32 {
     return camera_near() / ndc_depth;
 }
 
+/// Convert linear space depth to ndc world space
+fn depth_linear_to_ndc(linear_depth: f32) -> f32 {
+    return camera_near() / linear_depth;
+}
+
 /// Convert ndc space xy coordinate [-1.0 .. 1.0] to uv [0.0 .. 1.0]
 fn ndc_to_uv(ndc: vec2<f32>) -> vec2<f32> {
-    return ndc * vec2(0.5, -0.5) + vec2(0.5, 0.5);
+    return ndc * vec2(0.5, -0.5) + vec2(0.5);
 }
 
 /// Convert uv [0.0 .. 1.0] coordinate to ndc space xy [-1.0 .. 1.0]
 fn uv_to_ndc(uv: vec2<f32>) -> vec2<f32> {
     return (uv - vec2(0.5)) * vec2(2.0, -2.0);
+}
+
+/// returns the (0.0, 0.0) .. (1.0, 1.0) position within the viewport for the current render target
+/// [0 .. render target viewport size] eg. [(0.0, 0.0) .. (1280.0, 720.0)] to [(0.0, 0.0) .. (1.0, 1.0)]
+fn frag_coord_to_uv(frag_coord: vec2<f32>) -> vec2<f32> {
+    return (frag_coord - view.viewport.xy) / view.viewport.zw;
+}
+
+/// Convert frag coord to ndc
+fn frag_coord_to_ndc(frag_coord: vec4<f32>) -> vec3<f32> {
+    return vec3(uv_to_ndc(frag_coord_to_uv(frag_coord.xy)), frag_coord.z);
 }
