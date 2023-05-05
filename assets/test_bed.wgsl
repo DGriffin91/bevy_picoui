@@ -49,5 +49,9 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
     let compare_ndc_to_world_1 = f32(distance(world_a, in.world_position.xyz) < 0.00001);
     let compare_ndc_to_world_2 = f32(distance(world_b, in.world_position.xyz) < 0.00001);
 
-    return vec4(vec3(compare_ndc_2), 1.0);
+    let ndc_dir_a = direction_ndc_to_world(direction_world_to_ndc(N));
+
+    let w1 = direction_clip_to_world(direction_world_to_clip(N));
+
+    return vec4(vec3(w1), 1.0);
 }

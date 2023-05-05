@@ -107,6 +107,30 @@ fn position_world_to_ndc(world_pos: vec3<f32>) -> vec3<f32> {
     return ndc_pos.xyz / ndc_pos.w;
 }
 
+/// TODO incorrect - Convert a clip space direction to world space
+fn direction_clip_to_world(clip_dir: vec4<f32>) -> vec3<f32> {
+    let world_dir = view.inverse_view_proj * clip_dir;
+    return world_dir.xyz / world_dir.w;
+}
+
+/// TODO incorrect - Convert a world space direction to clip space
+fn direction_world_to_clip(world_dir: vec3<f32>) -> vec4<f32> {
+    let clip_dir = view.view_proj * vec4(world_dir, 0.0);
+    return clip_dir;
+}
+
+/// TODO incorrect - Convert a ndc space direction to world space
+fn direction_ndc_to_world(ndc_dir: vec3<f32>) -> vec3<f32> {
+    let world_dir = view.inverse_view_proj * vec4(ndc_dir, 0.0);
+    return world_dir.xyz / world_dir.w;
+}
+
+/// TODO incorrect - Convert a world space direction to ndc space
+fn direction_world_to_ndc(world_dir: vec3<f32>) -> vec3<f32> {
+    let ndc_dir = view.view_proj * vec4(world_dir, 0.0);
+    return ndc_dir.xyz / ndc_dir.w;
+}
+
 /// Retrieve the camera near clipping plane
 fn camera_near() -> f32 {
     return view.projection[3][2];
