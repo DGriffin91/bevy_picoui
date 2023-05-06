@@ -9,7 +9,7 @@
 // Same components as View, just renamed to avoid conflict while keeping nice syntax highlighting 
 struct ExampleView {
     // Camera projection * inverse_view
-    // view to clip
+    // world to clip
     view_proj: mat4x4<f32>,
 
     // Camera view * inverse_projection
