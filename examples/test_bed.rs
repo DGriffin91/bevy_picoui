@@ -1,6 +1,9 @@
+use std::time::Duration;
+
 use bevy::{
+    asset::ChangeWatcher,
     prelude::*,
-    reflect::TypeUuid,
+    reflect::{TypePath, TypeUuid},
     render::render_resource::{AsBindGroup, ShaderRef},
 };
 
@@ -11,13 +14,15 @@ fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
         .add_plugins(DefaultPlugins.set(AssetPlugin {
-            watch_for_changes: true,
+            watch_for_changes: ChangeWatcher::with_delay(Duration::from_millis(200)),
             ..default()
         }))
-        .add_plugin(CameraControllerPlugin)
-        .add_plugin(CoordinateTransformationsPlugin)
-        .add_plugin(MaterialPlugin::<TestMaterial>::default())
-        .add_startup_system(setup)
+        .add_plugins((
+            CameraControllerPlugin,
+            CoordinateTransformationsPlugin,
+            MaterialPlugin::<TestMaterial>::default(),
+        ))
+        .add_systems(Startup, setup)
         .run();
 }
 
@@ -90,6 +95,6 @@ impl Material for TestMaterial {
     }
 }
 
-#[derive(AsBindGroup, Debug, Clone, TypeUuid)]
+#[derive(AsBindGroup, Debug, Clone, TypeUuid, TypePath)]
 #[uuid = "e27f6ffe-1842-4822-8926-e0ed174294c8"]
 pub struct TestMaterial {}
