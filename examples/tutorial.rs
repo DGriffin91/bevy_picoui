@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use bevy::{
     asset::ChangeWatcher,
+    core_pipeline::clear_color::ClearColorConfig,
     math::*,
     prelude::*,
     render::{
@@ -26,6 +27,10 @@ fn main() {
             watch_for_changes: ChangeWatcher::with_delay(Duration::from_millis(200)),
             ..default()
         }))
+        .insert_resource(GizmoConfig {
+            render_layers: RenderLayers::layer(1),
+            ..default()
+        })
         .add_plugins((
             CameraControllerPlugin,
             CoordinateTransformationsPlugin,
@@ -71,10 +76,6 @@ fn setup(
     // User Camera
     commands.spawn((
         Camera3dBundle {
-            camera: Camera {
-                hdr: true,
-                ..default()
-            },
             transform: Transform::from_xyz(-2.0, 5.5, 10.0)
                 .looking_at(Vec3::new(0.0, 0.5, 0.0), Vec3::Y),
             ..default()
@@ -87,6 +88,17 @@ fn setup(
         Im3dTextCamera,
         RenderLayers::all(),
     ));
+
+    commands.spawn(Camera2dBundle {
+        camera: Camera {
+            order: 1,
+            ..default()
+        },
+        camera_2d: Camera2d {
+            clear_color: ClearColorConfig::None,
+        },
+        ..default()
+    });
 
     let size = Extent3d {
         width: 320,
@@ -140,7 +152,8 @@ fn setup(
                 .with_translation(cam_trans.translation + cam_trans.forward()),
             ..default()
         },
-        RenderLayers::layer(1),
+        RenderLayers::layer(2),
+        Camera2d::default(),
     ));
 
     // Example Camera
@@ -155,6 +168,7 @@ fn setup(
             ..default()
         },
         ExampleCamera,
+        RenderLayers::layer(0).with(1),
     ));
 
     // example instructions
