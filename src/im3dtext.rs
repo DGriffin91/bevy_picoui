@@ -7,14 +7,9 @@ use crate::{ndc_to_uv, prepare_view, View};
 
 pub struct ImTextPlugin;
 
-// RenderLayers are not supported for UI yet
-//#[derive(Resource, Default)]
-//pub struct ImTextRenderLayers(pub RenderLayers);
-
 impl Plugin for ImTextPlugin {
     fn build(&self, app: &mut App) {
-        app //.init_resource::<ImTextRenderLayers>()
-            .add_systems(PostUpdate, render_imtext.after(prepare_view));
+        app.add_systems(PostUpdate, render_imtext.after(prepare_view));
     }
 }
 
@@ -105,8 +100,6 @@ fn render_imtext(
                         position_type: PositionType::Absolute,
                         top: Val::Percent(text_uv.y * 100.0),
                         left: Val::Percent(text_uv.x * 100.0),
-                        //top: Val::Percent(50.0),
-                        //left: Val::Percent(50.0),
                         // TODO still not centered. When this is figured out add to Im3dText.
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,
@@ -115,7 +108,6 @@ fn render_imtext(
                     })
                     .with_text_alignment(TextAlignment::Center),
                 )
-                //.insert(render_layers.0)
                 .id();
             cache.insert(imtext.clone(), (entity, true));
         }

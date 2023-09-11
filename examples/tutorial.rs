@@ -26,8 +26,6 @@ fn main() {
             watch_for_changes: ChangeWatcher::with_delay(Duration::from_millis(200)),
             ..default()
         }))
-        // RenderLayers are not supported for UI yet
-        //.insert_resource(ImTextRenderLayers(RenderLayers::layer(1)))
         .add_plugins((
             CameraControllerPlugin,
             CoordinateTransformationsPlugin,
