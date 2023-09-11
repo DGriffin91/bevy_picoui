@@ -1,4 +1,4 @@
-#define_import_path bevy_coordinate_systems::transformations
+#define_import_path bevy_coordinate_systems::view_transformations
 #import bevy_pbr::mesh_view_bindings as view_bindings
 
 // Relevant sources.
@@ -44,22 +44,22 @@ struct View {
 };
 */
 
-
-/// World space
+/// World space:
 /// +y is up
 
-/// View space
+/// View space:
 /// -z is forward, +x is right, +y is up
+/// Forward is from the camera position into the scene.
 /// (0.0, 0.0, -1.0) is linear distance of 1.0 in front of the camera's view relative to the camera's rotation
 /// (0.0, 1.0, 0.0) is linear distance of 1.0 above the camera's view relative to the camera's rotation
 
-/// NDC (normalized device coordinate)
+/// NDC (normalized device coordinate):
 /// https://www.w3.org/TR/webgpu/#coordinate-systems
 /// (-1.0, -1.0) in NDC is located at the bottom-left corner of NDC
 /// (1.0, 1.0) in NDC is located at the top-right corner of NDC
 /// Z is depth where 1.0 is near clipping plane, and 0.0 is inf far away
 
-/// UV space
+/// UV space:
 /// 0.0, 0.0 is the top left
 /// 1.0, 1.0 is the bottom right
 
@@ -176,21 +176,48 @@ fn position_view_to_ndc(view_pos: vec3<f32>) -> vec3<f32> {
     return ndc_pos.xyz / ndc_pos.w;
 }
 
+// -----------------
+// DEPTH -----------
+// -----------------
 
-/// Retrieve the camera near clipping plane
-fn camera_near() -> f32 {
+/// Retrieve the perspective camera near clipping plane
+fn perspective_camera_near() -> f32 {
     return view_bindings::view.projection[3][2];
 }
 
-/// Convert ndc space depth to linear world space
-fn depth_ndc_to_linear(ndc_depth: f32) -> f32 {
-    return camera_near() / ndc_depth;
+/// Convert ndc depth to linear view z. 
+/// Note: Depth values in front of the camera will be negative as -z is forward
+fn depth_ndc_to_view_z(ndc_depth: f32) -> f32 {
+#ifdef VIEW_PROJECTION_PERSPECTIVE
+    return -perspective_camera_near() / ndc_depth;
+#else
+#ifdef VIEW_PROJECTION_ORTHOGRAPHIC
+    return -(view_bindings::view.projection[3][2] - ndc_depth) / view_bindings::view.projection[2][2];
+#else
+    let view_pos = view_bindings::view.inverse_projection * vec4(0.0, 0.0, ndc_depth, 1.0);
+    return view_pos.z / view_pos.w;
+#endif // VIEW_PROJECTION_ORTHOGRAPHIC
+#endif // VIEW_PROJECTION_PERSPECTIVE
 }
 
-/// Convert linear space depth to ndc world space
-fn depth_linear_to_ndc(linear_depth: f32) -> f32 {
-    return camera_near() / linear_depth;
+/// Convert linear view z to ndc depth. 
+/// Note: View z input should be negative for values in front of the camera as -z is forward
+fn view_z_to_depth_ndc(view_z: f32) -> f32 {
+#ifdef VIEW_PROJECTION_PERSPECTIVE
+    return -perspective_camera_near() / view_z;
+#else
+#ifdef VIEW_PROJECTION_ORTHOGRAPHIC
+    return view_bindings::view.projection[3][2] + view_z * view_bindings::view.projection[2][2];
+#else
+    let ndc_pos = view_bindings::view.projection * vec4(0.0, 0.0, view_z, 1.0);
+    return ndc_pos.z / ndc_pos.w;
+#endif // VIEW_PROJECTION_ORTHOGRAPHIC
+#endif // VIEW_PROJECTION_PERSPECTIVE
 }
+
+// -----------------
+// UV --------------
+// -----------------
 
 /// Convert ndc space xy coordinate [-1.0 .. 1.0] to uv [0.0 .. 1.0]
 fn ndc_to_uv(ndc: vec2<f32>) -> vec2<f32> {
