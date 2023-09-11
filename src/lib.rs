@@ -130,31 +130,31 @@ impl View {
     /// Convert a view space position to world space
     pub fn position_view_to_world(&self, view_pos: Vec3) -> Vec3 {
         let world_pos = self.view * view_pos.extend(1.0);
-        return world_pos.xyz();
+        world_pos.xyz()
     }
 
     /// Convert a clip space position to world space
     pub fn position_clip_to_world(&self, clip_pos: Vec4) -> Vec3 {
         let world_pos = self.inverse_view_proj * clip_pos;
-        return world_pos.xyz();
+        world_pos.xyz()
     }
 
     /// Convert a ndc space position to world space
     pub fn position_ndc_to_world(&self, ndc_pos: Vec3) -> Vec3 {
         let world_pos = self.inverse_view_proj * ndc_pos.extend(1.0);
-        return world_pos.xyz() / world_pos.w;
+        world_pos.xyz() / world_pos.w
     }
 
     /// Convert a view space direction to world space
     pub fn direction_view_to_world(&self, view_dir: Vec3) -> Vec3 {
         let world_dir = self.view * view_dir.extend(0.0);
-        return world_dir.xyz();
+        world_dir.xyz()
     }
 
     /// Convert a clip space direction to world space
     pub fn direction_clip_to_world(&self, clip_dir: Vec4) -> Vec3 {
         let world_dir = self.inverse_view_proj * clip_dir;
-        return world_dir.xyz();
+        world_dir.xyz()
     }
 
     // -----------------
@@ -164,31 +164,31 @@ impl View {
     /// Convert a world space position to view space
     pub fn position_world_to_view(&self, world_pos: Vec3) -> Vec3 {
         let view_pos = self.inverse_view * world_pos.extend(1.0);
-        return view_pos.xyz();
+        view_pos.xyz()
     }
 
     /// Convert a clip space position to view space
     pub fn position_clip_to_view(&self, clip_pos: Vec4) -> Vec3 {
         let view_pos = self.inverse_projection * clip_pos;
-        return view_pos.xyz() / view_pos.w;
+        view_pos.xyz() / view_pos.w
     }
 
     /// Convert a ndc space position to view space
     pub fn position_ndc_to_view(&self, ndc_pos: Vec3) -> Vec3 {
         let view_pos = self.inverse_projection * ndc_pos.extend(1.0);
-        return view_pos.xyz() / view_pos.w;
+        view_pos.xyz() / view_pos.w
     }
 
     /// Convert a world space direction to view space
     pub fn direction_world_to_view(&self, world_dir: Vec3) -> Vec3 {
         let view_dir = self.inverse_view * world_dir.extend(0.0);
-        return view_dir.xyz();
+        view_dir.xyz()
     }
 
     /// Convert a clip space direction to view space
     pub fn direction_clip_to_view(&self, clip_dir: Vec4) -> Vec3 {
         let view_dir = self.inverse_projection * clip_dir;
-        return view_dir.xyz();
+        view_dir.xyz()
     }
 
     // -----------------
@@ -197,26 +197,22 @@ impl View {
 
     /// Convert a world space position to clip space
     pub fn position_world_to_clip(&self, world_pos: Vec3) -> Vec4 {
-        let clip_pos = self.view_proj * world_pos.extend(1.0);
-        return clip_pos;
+        self.view_proj * world_pos.extend(1.0)
     }
 
     /// Convert a view space position to clip space
     pub fn position_view_to_clip(&self, view_pos: Vec3) -> Vec4 {
-        let clip_pos = self.projection * view_pos.extend(1.0);
-        return clip_pos;
+        self.projection * view_pos.extend(1.0)
     }
 
     /// Convert a world space direction to clip space
     pub fn direction_world_to_clip(&self, world_dir: Vec3) -> Vec4 {
-        let clip_dir = self.view_proj * world_dir.extend(0.0);
-        return clip_dir;
+        self.view_proj * world_dir.extend(0.0)
     }
 
     /// Convert a view space direction to clip space
     pub fn direction_view_to_clip(&self, view_dir: Vec3) -> Vec4 {
-        let clip_dir = self.projection * view_dir.extend(0.0);
-        return clip_dir;
+        self.projection * view_dir.extend(0.0)
     }
 
     // -----------------
@@ -226,13 +222,13 @@ impl View {
     /// Convert a world space position to ndc space
     pub fn position_world_to_ndc(&self, world_pos: Vec3) -> Vec3 {
         let ndc_pos = self.view_proj * world_pos.extend(1.0);
-        return ndc_pos.xyz() / ndc_pos.w;
+        ndc_pos.xyz() / ndc_pos.w
     }
 
     /// Convert a view space position to ndc space
     pub fn position_view_to_ndc(&self, view_pos: Vec3) -> Vec3 {
         let ndc_pos = self.projection * view_pos.extend(1.0);
-        return ndc_pos.xyz() / ndc_pos.w;
+        ndc_pos.xyz() / ndc_pos.w
     }
 
     // -----------------
@@ -241,7 +237,7 @@ impl View {
 
     /// Retrieve the perspective camera near clipping plane
     pub fn perspective_camera_near(&self) -> f32 {
-        return self.projection.w_axis[2];
+        self.projection.w_axis[2]
     }
 
     /// Convert ndc depth to linear view z.
@@ -278,21 +274,21 @@ impl View {
     /// returns the (0.0, 0.0) .. (1.0, 1.0) position within the viewport for the current render target
     /// [0 .. render target viewport size] eg. [(0.0, 0.0) .. (1280.0, 720.0)] to [(0.0, 0.0) .. (1.0, 1.0)]
     pub fn frag_coord_to_uv(&self, frag_coord: Vec2) -> Vec2 {
-        return (frag_coord - self.viewport.xy()) / self.viewport.zw();
+        (frag_coord - self.viewport.xy()) / self.viewport.zw()
     }
 
     /// Convert frag coord to ndc
     pub fn frag_coord_to_ndc(&self, frag_coord: Vec4) -> Vec3 {
-        return uv_to_ndc(self.frag_coord_to_uv(frag_coord.xy())).extend(frag_coord.z);
+        uv_to_ndc(self.frag_coord_to_uv(frag_coord.xy())).extend(frag_coord.z)
     }
 }
 
 /// Convert ndc space xy coordinate [-1.0 .. 1.0] to uv [0.0 .. 1.0]
 pub fn ndc_to_uv(ndc: Vec2) -> Vec2 {
-    return ndc * vec2(0.5, -0.5) + Vec2::splat(0.5);
+    ndc * vec2(0.5, -0.5) + Vec2::splat(0.5)
 }
 
 /// Convert uv [0.0 .. 1.0] coordinate to ndc space xy [-1.0 .. 1.0]
 pub fn uv_to_ndc(uv: Vec2) -> Vec2 {
-    return (uv - Vec2::splat(0.5)) * vec2(2.0, -2.0);
+    (uv - Vec2::splat(0.5)) * vec2(2.0, -2.0)
 }
