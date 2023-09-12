@@ -7,7 +7,7 @@ use bevy::{
     transform::systems::propagate_transforms,
 };
 
-pub mod im3dtext;
+pub mod impico;
 
 pub const VIEW_TRANSFORMATIONS: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 4396331565425081187);

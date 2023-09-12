@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use bevy::{
     asset::ChangeWatcher,
-    core_pipeline::clear_color::ClearColorConfig,
     math::*,
     prelude::*,
     render::{
@@ -12,11 +11,12 @@ use bevy::{
         },
         view::RenderLayers,
     },
+    sprite::Anchor,
 };
 
 use bevy_basic_camera::{CameraController, CameraControllerPlugin};
 use bevy_coordinate_systems::{
-    im3dtext::{Im3dText, Im3dTextCamera, ImTextPlugin},
+    impico::{ImItem, ImPicoPlugin, ImTextCamera, Pico},
     CoordinateTransformationsPlugin, View,
 };
 
@@ -34,7 +34,9 @@ fn main() {
         .add_plugins((
             CameraControllerPlugin,
             CoordinateTransformationsPlugin,
-            ImTextPlugin,
+            ImPicoPlugin {
+                create_default_cam_with_order: Some(1),
+            },
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, update)
@@ -85,20 +87,9 @@ fn setup(
             orbit_focus: Vec3::new(0.0, 0.5, 0.0),
             ..default()
         },
-        Im3dTextCamera,
+        ImTextCamera,
         RenderLayers::all(),
     ));
-
-    commands.spawn(Camera2dBundle {
-        camera: Camera {
-            order: 1,
-            ..default()
-        },
-        camera_2d: Camera2d {
-            clear_color: ClearColorConfig::None,
-        },
-        ..default()
-    });
 
     let size = Extent3d {
         width: 320,
@@ -171,39 +162,56 @@ fn setup(
         RenderLayers::layer(0).with(1),
     ));
 
-    // example instructions
+    // Example instructions
     commands.spawn(
-        TextBundle::from_section(
-            "Click and drag to orbit camera\nDolly with scroll wheel\nMove with WASD",
-            TextStyle {
-                font_size: 12.,
-                ..default()
-            },
-        )
-        .with_style(Style {
-            position_type: PositionType::Absolute,
-            top: Val::Px(12.0),
-            left: Val::Px(12.0),
+        ImItem {
+            position: vec3(0.0, 0.0, 0.0),
+            text: String::from(
+                "Click and drag to orbit camera\nDolly with scroll wheel\nMove with WASD",
+            ),
+            anchor: Anchor::TopLeft,
+            rect: vec2(250.0, 25.0),
+            alignment: TextAlignment::Left,
+            background: Color::rgba(0.0, 0.0, 0.0, 0.3),
             ..default()
-        }),
+        }
+        .keep(),
     );
 }
 
 #[derive(Component)]
 struct ExampleCamera;
 
-fn update(mut commands: Commands, mut gizmos: Gizmos, camera: Query<&View, With<ExampleCamera>>) {
+fn update(
+    mut commands: Commands,
+    mut gizmos: Gizmos,
+    camera: Query<&View, With<ExampleCamera>>,
+    mut pico: ResMut<Pico>,
+) {
     let Ok(view) = camera.get_single() else {
         return;
+    };
+
+    // Setup style for axis text
+    let axis_text = |p: Vec3, s: &str| -> ImItem {
+        ImItem {
+            position: p,
+            position_3d: true,
+            rect: vec2(18.0, 14.0),
+            background: Color::rgba(0.0, 0.0, 0.0, 0.3),
+            text: s.to_string(),
+            font_size: 14.0,
+            ..default()
+        }
     };
 
     // Draw axes
     gizmos.ray(Vec3::ZERO, Vec3::X * 1000.0, Color::RED);
     gizmos.ray(Vec3::ZERO, Vec3::Y * 1000.0, Color::GREEN);
     gizmos.ray(Vec3::ZERO, Vec3::Z * 1000.0, Color::BLUE);
-    commands.spawn(Im3dText::new(Vec3::X, "+X"));
-    commands.spawn(Im3dText::new(Vec3::Y, "+Y"));
-    commands.spawn(Im3dText::new(Vec3::Z, "+Z"));
+    commands.spawn(axis_text(Vec3::X, "+X"));
+    commands.spawn(axis_text(Vec3::Y, "+Y"));
+    commands.spawn(axis_text(Vec3::Z, "+Z"));
 
     // Draw Camera
     {
@@ -234,8 +242,8 @@ fn update(mut commands: Commands, mut gizmos: Gizmos, camera: Query<&View, With<
         gizmos.ray(view_zero, view_x_dir, Color::RED);
         gizmos.ray(view_zero, view_y_dir, Color::GREEN);
         gizmos.ray(view_zero, view_z_dir, Color::BLUE);
-        commands.spawn(Im3dText::new(view_zero + view_x_dir, "+X"));
-        commands.spawn(Im3dText::new(view_zero + view_y_dir, "+Y"));
-        commands.spawn(Im3dText::new(view_zero + view_z_dir, "+Z"));
+        commands.spawn(axis_text(view_zero + view_x_dir, "+X"));
+        commands.spawn(axis_text(view_zero + view_y_dir, "+Y"));
+        commands.spawn(axis_text(view_zero + view_z_dir, "+Z"));
     }
 }
