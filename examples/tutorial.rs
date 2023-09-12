@@ -204,71 +204,67 @@ fn update(
 
     pico.add(PicoItem {
         position: vec3(0.01, 0.15, 0.0),
-        rect: vec2(0.1, 0.04),
+        rect: vec2(0.1, 0.02),
         text: "- Camera -".into(),
-        rect_anchor: Anchor::CenterLeft,
+        rect_anchor: Anchor::TopLeft,
         ..default()
     })
     .last();
 
-    let tdrag = |pico: &mut Pico, position: Vec3, label: &str, value: f32| -> DragValue {
-        let dv = drag_value(pico, position, 0.04, 0.06, 0.04, label, 0.01, value);
+    let margin = 0.01;
+    let x = 0.01;
+
+    let tdrag = |pico: &mut Pico, label: &str, value: f32| -> DragValue {
+        let dv = drag_value(
+            pico,
+            vec3(x, pico.bbox(pico.last()).w + margin, 0.0),
+            0.04,
+            0.06,
+            0.04,
+            label,
+            0.01,
+            value,
+        );
         dv
     };
 
-    let dv = tdrag(&mut pico, vec3(0.01, 0.2, 0.0), "Local X", 0.0);
+    let dv = tdrag(&mut pico, "Local X", 0.0);
     pico.get_mut(dv.drag_index).background += Color::rgba(0.0, -0.5, -0.5, 0.05); // Need * for color
     let v = trans.right();
     trans.translation += v * dv.value;
 
-    let dv = tdrag(&mut pico, vec3(0.01, 0.25, 0.0), "Local Y", 0.0);
+    let dv = tdrag(&mut pico, "Local Y", 0.0);
     pico.get_mut(dv.drag_index).background += Color::rgba(-0.5, 0.0, -0.5, 0.05); // Need * for color
     let v = trans.forward();
     trans.translation += v * dv.value;
 
-    let dv = tdrag(&mut pico, vec3(0.01, 0.3, 0.0), "Local Z", 0.0);
+    let dv = tdrag(&mut pico, "Local Z", 0.0);
     pico.get_mut(dv.drag_index).background += Color::rgba(-0.5, -0.5, 0.0, 0.05); // Need * for color
     let v = trans.up();
     trans.translation += v * dv.value;
 
-    let dv = tdrag(
-        &mut pico,
-        vec3(0.01, 0.35, 0.0),
-        "World X",
-        trans.translation.x,
-    );
+    let dv = tdrag(&mut pico, "World X", trans.translation.x);
     pico.get_mut(dv.drag_index).background += Color::rgba(0.0, -0.5, -0.5, 0.05); // Need * for color
     trans.translation.x = dv.value;
 
-    let dv = tdrag(
-        &mut pico,
-        vec3(0.01, 0.4, 0.0),
-        "World Y",
-        trans.translation.y,
-    );
+    let dv = tdrag(&mut pico, "World Y", trans.translation.y);
     pico.get_mut(dv.drag_index).background += Color::rgba(-0.5, 0.0, -0.5, 0.05); // Need * for color
     trans.translation.y = dv.value;
 
-    let dv = tdrag(
-        &mut pico,
-        vec3(0.01, 0.45, 0.0),
-        "World Z",
-        trans.translation.z,
-    );
+    let dv = tdrag(&mut pico, "World Z", trans.translation.z);
     pico.get_mut(dv.drag_index).background += Color::rgba(-0.5, -0.5, 0.0, 0.05); // Need * for color
     trans.translation.z = dv.value;
 
     let btn = button(
         &mut pico,
-        vec3(0.01, 0.5, 0.0),
+        vec3(0.01, dv.bbox.w + margin, 0.0),
         vec2(0.1, 0.04),
         "RESET CAMERA",
     );
-    pico.get_mut(btn).rect_anchor = Anchor::CenterLeft;
+    pico.get_mut(btn).rect_anchor = Anchor::TopLeft;
     if pico.clicked(btn) {
         *trans = get_default_cam_trans();
     }
-
     // Setup style for axis text
     let axis_text = |p: Vec3, s: &str| -> PicoItem {
         PicoItem {

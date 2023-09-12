@@ -1,7 +1,7 @@
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
     input::InputSystem,
-    math::{vec2, Vec3Swizzles},
+    math::{vec2, vec4, Vec3Swizzles, Vec4Swizzles},
     prelude::*,
     sprite::Anchor,
     text::{BreakLineOn, Text2dBounds},
@@ -73,6 +73,7 @@ pub struct DragValue {
     pub value: f32,
     pub text_index: usize,
     pub drag_index: usize,
+    pub bbox: Vec4,
 }
 
 pub fn drag_value(
@@ -86,13 +87,13 @@ pub fn drag_value(
     value: f32,
 ) -> DragValue {
     let mut value = value;
-    let text_item = pico.items.len();
+    let text_index = pico.items.len();
     let pico = pico.add(PicoItem {
         text: label.to_string(),
         position,
         rect: vec2(label_width, height),
         anchor: Anchor::CenterLeft,
-        rect_anchor: Anchor::CenterLeft,
+        rect_anchor: Anchor::TopLeft,
         ..default()
     });
 
@@ -103,26 +104,29 @@ pub fn drag_value(
         ..default()
     };
 
-    b.rect_anchor = Anchor::CenterLeft;
-    let drag_item = pico.items.len();
+    b.rect_anchor = Anchor::TopLeft;
+    let drag_index = pico.items.len();
     let pico = pico.add(b);
-    let dragging = if let Some(dragged) = pico.dragged(drag_item) {
+    let dragging = if let Some(dragged) = pico.dragged(drag_index) {
         pico.items.last_mut().unwrap().text = format!("{:.2}", dragged.total_delta().x * scale);
         value = dragged.delta().x * scale + value;
         true
     } else {
         false
     };
-    let a = if pico.hovered(drag_item) || dragging {
+    let a = if pico.hovered(drag_index) || dragging {
         0.03
     } else {
         0.01
     };
-    pico.get_mut(drag_item).background = Color::rgba(1.0, 1.0, 1.0, a);
+    pico.get_mut(drag_index).background = Color::rgba(1.0, 1.0, 1.0, a);
+    let a = pico.bbox(text_index);
+    let b = pico.bbox(drag_index);
     DragValue {
         value,
-        text_index: text_item,
-        drag_index: drag_item,
+        text_index,
+        drag_index,
+        bbox: vec4(a.x.min(b.x), a.y.min(b.y), a.z.max(b.z), a.w.max(b.w)),
     }
 }
 
@@ -258,6 +262,12 @@ impl Pico {
         }
         false
     }
+    pub fn bbox(&self, index: usize) -> Vec4 {
+        if let Some(cache_item) = self.cache.get(&self.get(index).spatial_id.unwrap()) {
+            return cache_item.bbox;
+        }
+        Vec4::ZERO
+    }
     pub fn hovered(&self, index: usize) -> bool {
         self.get_hovered(index).is_some()
     }
@@ -324,6 +334,7 @@ pub struct CacheItem {
     pub drag: Option<Drag>,
     pub id: u64,
     pub input: Option<Input<MouseButton>>,
+    pub bbox: Vec4,
 }
 
 #[derive(Component)]
@@ -420,11 +431,14 @@ fn render(
                                 drag.end = cursor_pos;
                             }
                         }
-                        let half_size = custom_size * 0.5;
-                        let xy = window_size * 0.5 + trans.translation.xy() * vec2(1.0, -1.0);
-                        let a = xy - half_size + custom_size * -sprite.anchor.as_vec();
-                        let b = xy + half_size + custom_size * -sprite.anchor.as_vec();
-                        if cursor_pos.cmpge(a).all() && cursor_pos.cmple(b).all() {
+                        existing_cache_item.bbox = get_bbox(
+                            custom_size / window_size,
+                            trans.translation.xy() / window_size * vec2(1.0, -1.0) + 0.5,
+                            &sprite.anchor,
+                        );
+                        let xy = existing_cache_item.bbox.xy() * window_size;
+                        let zw = existing_cache_item.bbox.zw() * window_size;
+                        if cursor_pos.cmpge(xy).all() && cursor_pos.cmple(zw).all() {
                             existing_cache_item.hover = true;
                             if !first_interact_found {
                                 existing_cache_item.input = Some(mouse_button_input.clone());
@@ -511,6 +525,11 @@ fn render(
                         });
                     })
                     .id();
+                cache_item.bbox = get_bbox(
+                    item.rect,
+                    trans.translation.xy() / window_size * vec2(1.0, -1.0) + 0.5,
+                    &sprite.anchor,
+                );
                 cache_item.interactable = true;
                 cache_item.entity = Some(entity);
             } else {
@@ -538,4 +557,11 @@ fn render(
     // clean up cache
     state.cache.retain(|_, cache_item| cache_item.life >= 0.0);
     state.interacting = interacting;
+}
+
+fn get_bbox(rect: Vec2, uv_position: Vec2, anchor: &Anchor) -> Vec4 {
+    let half_size = rect * 0.5;
+    let a = uv_position - half_size + rect * -anchor.as_vec() * vec2(1.0, -1.0);
+    let b = uv_position + half_size + rect * -anchor.as_vec() * vec2(1.0, -1.0);
+    vec4(a.x, a.y, b.x, b.y)
 }
