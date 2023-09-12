@@ -16,7 +16,7 @@ use bevy::{
 
 use bevy_basic_camera::{CameraController, CameraControllerPlugin};
 use bevy_coordinate_systems::{
-    impico::{ImItem, ImPicoPlugin, ImTextCamera, Pico},
+    impico::{render_imtext, ImItem, ImPicoPlugin, ImTextCamera, Pico},
     CoordinateTransformationsPlugin, View,
 };
 
@@ -39,7 +39,7 @@ fn main() {
             },
         ))
         .add_systems(Startup, setup)
-        .add_systems(Update, update)
+        .add_systems(Update, update.before(render_imtext))
         .run();
 }
 
@@ -85,6 +85,7 @@ fn setup(
         CameraController {
             orbit_mode: true,
             orbit_focus: Vec3::new(0.0, 0.5, 0.0),
+            mouse_key_enable_mouse: MouseButton::Right,
             ..default()
         },
         ImTextCamera,
@@ -120,63 +121,49 @@ fn setup(
 
     let cam_trans = Transform::from_xyz(3.0, 2.5, 3.0).looking_at(Vec3::ZERO, Vec3::Y);
 
-    // Post processing 2d quad, with material using the render texture done by the main camera, with a custom shader.
-    commands.spawn((
-        PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Quad::new(Vec2::new(
-                /*
-                Taken from below since we don't View yet.
-                dbg!(
-                    line_box[0].distance(line_box[1]),
-                    line_box[1].distance(line_box[2])
-                );
-                */
-                1.4727595, 0.82842755,
-            )))),
-            material: materials.add(StandardMaterial {
-                base_color_texture: Some(image_h.clone()),
-                unlit: true,
-                ..default()
-            }),
-            transform: cam_trans
-                .clone()
-                .with_translation(cam_trans.translation + cam_trans.forward()),
-            ..default()
-        },
-        RenderLayers::layer(2),
-        Camera2d::default(),
-    ));
-
     // Example Camera
-    commands.spawn((
-        Camera3dBundle {
-            camera: Camera {
-                order: -1,
-                target: RenderTarget::Image(image_h),
+    commands
+        .spawn((
+            Camera3dBundle {
+                camera: Camera {
+                    order: -1,
+                    target: RenderTarget::Image(image_h.clone()),
+                    ..default()
+                },
+                transform: cam_trans,
                 ..default()
             },
-            transform: cam_trans,
-            ..default()
-        },
-        ExampleCamera,
-        RenderLayers::layer(0).with(1),
-    ));
-
-    // Example instructions
-    commands.spawn(
-        ImItem {
-            position: vec3(0.0, 0.0, 0.0),
-            text: String::from(
-                "Click and drag to orbit camera\nDolly with scroll wheel\nMove with WASD",
-            ),
-            anchor: Anchor::TopLeft,
-            rect: vec2(250.0, 25.0),
-            alignment: TextAlignment::Left,
-            background: Color::rgba(0.0, 0.0, 0.0, 0.3),
-            ..default()
-        }
-        .keep(),
-    );
+            ExampleCamera,
+            RenderLayers::layer(0).with(1),
+            Visibility::Visible,
+            ComputedVisibility::default(),
+        ))
+        .with_children(|builder| {
+            // Post processing 2d quad, with material using the render texture done by the main camera, with a custom shader.
+            builder.spawn((
+                PbrBundle {
+                    mesh: meshes.add(Mesh::from(shape::Quad::new(Vec2::new(
+                        /*
+                        Taken from below since we don't View yet.
+                        dbg!(
+                            line_box[0].distance(line_box[1]),
+                            line_box[1].distance(line_box[2])
+                        );
+                        */
+                        1.4727595, 0.82842755,
+                    )))),
+                    material: materials.add(StandardMaterial {
+                        base_color_texture: Some(image_h),
+                        unlit: true,
+                        ..default()
+                    }),
+                    transform: Transform::from_translation(-Vec3::Z),
+                    ..default()
+                },
+                RenderLayers::layer(2),
+                Camera2d::default(),
+            ));
+        });
 }
 
 #[derive(Component)]
@@ -185,10 +172,26 @@ struct ExampleCamera;
 fn update(
     mut commands: Commands,
     mut gizmos: Gizmos,
-    camera: Query<&View, With<ExampleCamera>>,
+    mut camera: Query<(&View, &mut Transform), With<ExampleCamera>>,
     mut pico: ResMut<Pico>,
 ) {
-    let Ok(view) = camera.get_single() else {
+    // Example instructions
+    commands.spawn(
+        ImItem {
+            position: vec3(0.0, 0.0, 0.0),
+            text: String::from(
+                "Click and drag to orbit camera\nDolly with scroll wheel\nMove with WASD",
+            ),
+            rect_anchor: Anchor::TopLeft,
+            rect: vec2(0.2, 0.1),
+            alignment: TextAlignment::Left,
+            background: Color::rgba(0.0, 0.0, 0.0, 0.3),
+            ..default()
+        }
+        .keep(),
+    );
+
+    let Ok((view, mut trans)) = camera.get_single_mut() else {
         return;
     };
 
@@ -197,13 +200,76 @@ fn update(
         ImItem {
             position: p,
             position_3d: true,
-            rect: vec2(18.0, 14.0),
+            rect: vec2(0.02, 0.02),
             background: Color::rgba(0.0, 0.0, 0.0, 0.3),
             text: s.to_string(),
-            font_size: 14.0,
+            font_size: 0.02,
             ..default()
         }
     };
+
+    let mut drag_value = |p: Vec3, s: &str, v: f32, c: Color| -> f32 {
+        let rect = vec2(0.09, 0.04);
+        let pico = pico.add(ImItem {
+            text: s.to_string(),
+            position: p,
+            rect,
+            anchor: Anchor::CenterLeft,
+            rect_anchor: Anchor::CenterLeft,
+            ..default()
+        });
+        let mut b = ImItem::button2d(
+            p + Vec3::X * rect.x,
+            vec2(0.05, rect.y),
+            &format!("{:.2}", v),
+        );
+        b.color = c;
+        b.background = Color::rgba(1.0, 1.0, 1.0, 0.01);
+        b.rect_anchor = Anchor::CenterLeft;
+        let pico = pico.add(b);
+        if let Some(dragged) = pico.dragged() {
+            let scale = 0.01;
+            pico.items.last_mut().unwrap().text = format!("{:.2}", dragged.total_delta().x * scale);
+            return dragged.delta().x * scale + v;
+        }
+        v
+    };
+
+    let delta = drag_value(vec3(0.01, 0.15, 0.0), "Local Camera X", 0.0, Color::RED);
+    let v = trans.right();
+    trans.translation += v * delta;
+
+    let delta = drag_value(vec3(0.01, 0.20, 0.0), "Local Camera Y", 0.0, Color::GREEN);
+    let v = trans.forward();
+    trans.translation += v * delta;
+
+    let delta = drag_value(vec3(0.01, 0.25, 0.0), "Local Camera Z", 0.0, Color::BLUE);
+    let v = trans.up();
+    trans.translation += v * delta;
+
+    let delta = drag_value(
+        vec3(0.01, 0.30, 0.0),
+        "World Camera X",
+        trans.translation.x,
+        Color::RED,
+    );
+    trans.translation.x = delta;
+
+    let delta = drag_value(
+        vec3(0.01, 0.35, 0.0),
+        "World Camera Y",
+        trans.translation.y,
+        Color::GREEN,
+    );
+    trans.translation.y = delta;
+
+    let delta = drag_value(
+        vec3(0.01, 0.40, 0.0),
+        "World Camera Z",
+        trans.translation.z,
+        Color::BLUE,
+    );
+    trans.translation.z = delta;
 
     // Draw axes
     gizmos.ray(Vec3::ZERO, Vec3::X * 1000.0, Color::RED);
