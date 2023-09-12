@@ -1,14 +1,13 @@
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
-    math::{vec2, vec3, Vec3Swizzles},
+    math::{vec2, Vec3Swizzles},
     prelude::*,
-    sprite::{calculate_bounds_2d, Anchor},
+    sprite::Anchor,
     text::{BreakLineOn, Text2dBounds},
-    transform::TransformSystem,
 };
 use core::hash::Hash;
 use core::hash::Hasher;
-use std::{collections::hash_map::DefaultHasher, mem};
+use std::collections::hash_map::DefaultHasher;
 
 use bevy::utils::HashMap;
 
@@ -257,6 +256,7 @@ pub struct CacheItem {
 #[derive(Component)]
 pub struct ImEntity;
 
+#[allow(clippy::too_many_arguments)]
 pub fn render_imtext(
     mut commands: Commands,
     time: Res<Time>,
@@ -291,7 +291,7 @@ pub fn render_imtext(
         }
     }
 
-    let mut items = mem::replace(&mut state.items, Vec::new());
+    let mut items = std::mem::take(&mut state.items);
 
     // Move ImItem entites to local set
     for (imtext_entity, item) in &item_entities {
@@ -346,15 +346,15 @@ pub fn render_imtext(
                         if cursor_pos.cmpge(a).all() && cursor_pos.cmple(b).all() {
                             existing_cache_item.hover = true;
                             existing_cache_item.input = Some(mouse_button_input.clone());
-                            if mouse_button_input.pressed(MouseButton::Left) && !*currently_dragging
+                            if mouse_button_input.pressed(MouseButton::Left)
+                                && !*currently_dragging
+                                && existing_cache_item.drag.is_none()
                             {
-                                if existing_cache_item.drag.is_none() {
-                                    existing_cache_item.drag = Some(Drag {
-                                        start: cursor_pos,
-                                        end: cursor_pos,
-                                        last_frame: cursor_pos,
-                                    });
-                                }
+                                existing_cache_item.drag = Some(Drag {
+                                    start: cursor_pos,
+                                    end: cursor_pos,
+                                    last_frame: cursor_pos,
+                                });
                             }
                         }
                     }
