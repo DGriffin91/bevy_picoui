@@ -16,9 +16,13 @@ use bevy::{
 
 use bevy_basic_camera::{CameraController, CameraControllerPlugin};
 use bevy_coordinate_systems::{
-    impico::{render_imtext, ImItem, ImPicoPlugin, ImTextCamera, Pico},
+    impico::{button, drag_value, DragValue, ImTextCamera, Pico, PicoItem, PicoPlugin},
     CoordinateTransformationsPlugin, View,
 };
+
+fn get_default_cam_trans() -> Transform {
+    Transform::from_xyz(3.0, 2.5, 3.0).looking_at(Vec3::ZERO, Vec3::Y)
+}
 
 fn main() {
     App::new()
@@ -34,12 +38,12 @@ fn main() {
         .add_plugins((
             CameraControllerPlugin,
             CoordinateTransformationsPlugin,
-            ImPicoPlugin {
+            PicoPlugin {
                 create_default_cam_with_order: Some(1),
             },
         ))
         .add_systems(Startup, setup)
-        .add_systems(Update, update.before(render_imtext))
+        .add_systems(Update, update)
         .run();
 }
 
@@ -85,7 +89,6 @@ fn setup(
         CameraController {
             orbit_mode: true,
             orbit_focus: Vec3::new(0.0, 0.5, 0.0),
-            mouse_key_enable_mouse: MouseButton::Right,
             ..default()
         },
         ImTextCamera,
@@ -119,8 +122,6 @@ fn setup(
     image.resize(size);
     let image_h = images.add(image);
 
-    let cam_trans = Transform::from_xyz(3.0, 2.5, 3.0).looking_at(Vec3::ZERO, Vec3::Y);
-
     // Example Camera
     commands
         .spawn((
@@ -130,7 +131,7 @@ fn setup(
                     target: RenderTarget::Image(image_h.clone()),
                     ..default()
                 },
-                transform: cam_trans,
+                transform: get_default_cam_trans(),
                 ..default()
             },
             ExampleCamera,
@@ -174,10 +175,16 @@ fn update(
     mut gizmos: Gizmos,
     mut camera: Query<(&View, &mut Transform), With<ExampleCamera>>,
     mut pico: ResMut<Pico>,
+    mut camera_controller: Query<&mut CameraController>,
 ) {
+    if let Some(mut camera_controller) = camera_controller.iter_mut().next() {
+        // Disable camera controller if pico is interacting
+        camera_controller.enabled = !pico.interacting;
+    }
+
     // Example instructions
     commands.spawn(
-        ImItem {
+        PicoItem {
             position: vec3(0.0, 0.0, 0.0),
             text: String::from(
                 "Click and drag to orbit camera\nDolly with scroll wheel\nMove with WASD",
@@ -195,9 +202,76 @@ fn update(
         return;
     };
 
+    pico.add(PicoItem {
+        position: vec3(0.01, 0.15, 0.0),
+        rect: vec2(0.1, 0.04),
+        text: "- Camera -".into(),
+        rect_anchor: Anchor::CenterLeft,
+        ..default()
+    })
+    .last();
+
+    let tdrag = |pico: &mut Pico, position: Vec3, label: &str, value: f32| -> DragValue {
+        let dv = drag_value(pico, position, 0.04, 0.06, 0.04, label, 0.01, value);
+        dv
+    };
+
+    let dv = tdrag(&mut pico, vec3(0.01, 0.2, 0.0), "Local X", 0.0);
+    pico.get_mut(dv.drag_index).background += Color::rgba(0.0, -0.5, -0.5, 0.05); // Need * for color
+    let v = trans.right();
+    trans.translation += v * dv.value;
+
+    let dv = tdrag(&mut pico, vec3(0.01, 0.25, 0.0), "Local Y", 0.0);
+    pico.get_mut(dv.drag_index).background += Color::rgba(-0.5, 0.0, -0.5, 0.05); // Need * for color
+    let v = trans.forward();
+    trans.translation += v * dv.value;
+
+    let dv = tdrag(&mut pico, vec3(0.01, 0.3, 0.0), "Local Z", 0.0);
+    pico.get_mut(dv.drag_index).background += Color::rgba(-0.5, -0.5, 0.0, 0.05); // Need * for color
+    let v = trans.up();
+    trans.translation += v * dv.value;
+
+    let dv = tdrag(
+        &mut pico,
+        vec3(0.01, 0.35, 0.0),
+        "World X",
+        trans.translation.x,
+    );
+    pico.get_mut(dv.drag_index).background += Color::rgba(0.0, -0.5, -0.5, 0.05); // Need * for color
+    trans.translation.x = dv.value;
+
+    let dv = tdrag(
+        &mut pico,
+        vec3(0.01, 0.4, 0.0),
+        "World Y",
+        trans.translation.y,
+    );
+    pico.get_mut(dv.drag_index).background += Color::rgba(-0.5, 0.0, -0.5, 0.05); // Need * for color
+    trans.translation.y = dv.value;
+
+    let dv = tdrag(
+        &mut pico,
+        vec3(0.01, 0.45, 0.0),
+        "World Z",
+        trans.translation.z,
+    );
+    pico.get_mut(dv.drag_index).background += Color::rgba(-0.5, -0.5, 0.0, 0.05); // Need * for color
+    trans.translation.z = dv.value;
+
+    let btn = button(
+        &mut pico,
+        vec3(0.01, 0.5, 0.0),
+        vec2(0.1, 0.04),
+        "RESET CAMERA",
+    );
+    pico.get_mut(btn).rect_anchor = Anchor::CenterLeft;
+    if pico.clicked(btn) {
+        *trans = get_default_cam_trans();
+    }
+
     // Setup style for axis text
-    let axis_text = |p: Vec3, s: &str| -> ImItem {
-        ImItem {
+    let axis_text = |p: Vec3, s: &str| -> PicoItem {
+        PicoItem {
             position: p,
             position_3d: true,
             rect: vec2(0.02, 0.02),
@@ -207,69 +281,6 @@ fn update(
             ..default()
         }
     };
-
-    let mut drag_value = |p: Vec3, s: &str, v: f32, c: Color| -> f32 {
-        let rect = vec2(0.09, 0.04);
-        let pico = pico.add(ImItem {
-            text: s.to_string(),
-            position: p,
-            rect,
-            anchor: Anchor::CenterLeft,
-            rect_anchor: Anchor::CenterLeft,
-            ..default()
-        });
-        let mut b = ImItem::button2d(
-            p + Vec3::X * rect.x,
-            vec2(0.05, rect.y),
-            &format!("{:.2}", v),
-        );
-        b.color = c;
-        b.background = Color::rgba(1.0, 1.0, 1.0, 0.01);
-        b.rect_anchor = Anchor::CenterLeft;
-        let pico = pico.add(b);
-        if let Some(dragged) = pico.dragged() {
-            let scale = 0.01;
-            pico.items.last_mut().unwrap().text = format!("{:.2}", dragged.total_delta().x * scale);
-            return dragged.delta().x * scale + v;
-        }
-        v
-    };
-
-    let delta = drag_value(vec3(0.01, 0.15, 0.0), "Local Camera X", 0.0, Color::RED);
-    let v = trans.right();
-    trans.translation += v * delta;
-
-    let delta = drag_value(vec3(0.01, 0.20, 0.0), "Local Camera Y", 0.0, Color::GREEN);
-    let v = trans.forward();
-    trans.translation += v * delta;
-
-    let delta = drag_value(vec3(0.01, 0.25, 0.0), "Local Camera Z", 0.0, Color::BLUE);
-    let v = trans.up();
-    trans.translation += v * delta;
-
-    let delta = drag_value(
-        vec3(0.01, 0.30, 0.0),
-        "World Camera X",
-        trans.translation.x,
-        Color::RED,
-    );
-    trans.translation.x = delta;
-
-    let delta = drag_value(
-        vec3(0.01, 0.35, 0.0),
-        "World Camera Y",
-        trans.translation.y,
-        Color::GREEN,
-    );
-    trans.translation.y = delta;
-
-    let delta = drag_value(
-        vec3(0.01, 0.40, 0.0),
-        "World Camera Z",
-        trans.translation.z,
-        Color::BLUE,
-    );
-    trans.translation.z = delta;
 
     // Draw axes
     gizmos.ray(Vec3::ZERO, Vec3::X * 1000.0, Color::RED);

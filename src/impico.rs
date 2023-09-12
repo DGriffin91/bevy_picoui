@@ -1,5 +1,6 @@
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
+    input::InputSystem,
     math::{vec2, Vec3Swizzles},
     prelude::*,
     sprite::Anchor,
@@ -11,7 +12,7 @@ use std::collections::hash_map::DefaultHasher;
 
 use bevy::utils::HashMap;
 
-pub struct ImPicoPlugin {
+pub struct PicoPlugin {
     // Set if using in a scene with no 2d camera
     pub create_default_cam_with_order: Option<isize>,
 }
@@ -19,10 +20,10 @@ pub struct ImPicoPlugin {
 #[derive(Resource)]
 pub struct CreateDefaultCamWithOrder(isize);
 
-impl Plugin for ImPicoPlugin {
+impl Plugin for PicoPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Pico>()
-            .add_systems(Update, render_imtext);
+            .add_systems(PreUpdate, render.after(InputSystem));
         if let Some(n) = self.create_default_cam_with_order {
             app.insert_resource(CreateDefaultCamWithOrder(n))
                 .add_systems(Startup, setup_default_cam);
@@ -43,12 +44,94 @@ fn setup_default_cam(mut commands: Commands, order: Res<CreateDefaultCamWithOrde
     });
 }
 
+// -------------------------
+// Button example widget
+// -------------------------
+
+pub fn button(pico: &mut Pico, position: Vec3, rect: Vec2, text: &str) -> usize {
+    let button_index = pico.items.len();
+    let pico = pico.add(PicoItem {
+        text: text.to_string(),
+        position,
+        rect,
+        ..default()
+    });
+    let a = if pico.hovered(button_index) {
+        0.03
+    } else {
+        0.01
+    };
+    pico.get_mut(button_index).background = Color::rgba(1.0, 1.0, 1.0, a);
+    button_index
+}
+
+// -------------------------
+// Value drag example widget
+// -------------------------
+
+pub struct DragValue {
+    pub value: f32,
+    pub text_index: usize,
+    pub drag_index: usize,
+}
+
+pub fn drag_value(
+    pico: &mut Pico,
+    position: Vec3,
+    height: f32,
+    label_width: f32,
+    drag_width: f32,
+    label: &str,
+    scale: f32,
+    value: f32,
+) -> DragValue {
+    let mut value = value;
+    let text_item = pico.items.len();
+    let pico = pico.add(PicoItem {
+        text: label.to_string(),
+        position,
+        rect: vec2(label_width, height),
+        anchor: Anchor::CenterLeft,
+        rect_anchor: Anchor::CenterLeft,
+        ..default()
+    });
+
+    let mut b = PicoItem {
+        text: format!("{:.2}", value),
+        position: position + Vec3::X * label_width,
+        rect: vec2(drag_width, height),
+        ..default()
+    };
+
+    b.rect_anchor = Anchor::CenterLeft;
+    let drag_item = pico.items.len();
+    let pico = pico.add(b);
+    let dragging = if let Some(dragged) = pico.dragged(drag_item) {
+        pico.items.last_mut().unwrap().text = format!("{:.2}", dragged.total_delta().x * scale);
+        value = dragged.delta().x * scale + value;
+        true
+    } else {
+        false
+    };
+    let a = if pico.hovered(drag_item) || dragging {
+        0.03
+    } else {
+        0.01
+    };
+    pico.get_mut(drag_item).background = Color::rgba(1.0, 1.0, 1.0, a);
+    DragValue {
+        value,
+        text_index: text_item,
+        drag_index: drag_item,
+    }
+}
+
 // Only supports one camera.
 #[derive(Component)]
 pub struct ImTextCamera;
 
 #[derive(Component, Clone, Debug)]
-pub struct ImItem {
+pub struct PicoItem {
     pub text: String,
     /// If position_3d is false position is the screen uv coords with 0.0, 0.0 at top left
     /// If position_3d is true position is the world space translation
@@ -70,9 +153,9 @@ pub struct ImItem {
     pub spatial_id: Option<u64>,
 }
 
-impl Default for ImItem {
+impl Default for PicoItem {
     fn default() -> Self {
-        ImItem {
+        PicoItem {
             position: Vec3::ZERO,
             position_3d: false,
             rect: Vec2::INFINITY,
@@ -91,38 +174,19 @@ impl Default for ImItem {
     }
 }
 
-impl ImItem {
-    pub fn new2d(position: Vec3, text: &str) -> ImItem {
-        ImItem {
+impl PicoItem {
+    pub fn new2d(position: Vec3, text: &str) -> PicoItem {
+        PicoItem {
             position,
             text: text.to_string(),
             ..default()
         }
     }
-    pub fn new3d(position: Vec3, text: &str) -> ImItem {
-        ImItem {
+    pub fn new3d(position: Vec3, text: &str) -> PicoItem {
+        PicoItem {
             position,
             text: text.to_string(),
             position_3d: true,
-            ..default()
-        }
-    }
-    pub fn button2d(position: Vec3, rect: Vec2, text: &str) -> ImItem {
-        ImItem {
-            position,
-            text: text.to_string(),
-            button: true,
-            rect,
-            ..default()
-        }
-    }
-    pub fn button3d(position: Vec3, rect: Vec2, text: &str) -> ImItem {
-        ImItem {
-            position,
-            text: text.to_string(),
-            button: true,
-            position_3d: true,
-            rect,
             ..default()
         }
     }
@@ -140,7 +204,6 @@ impl ImItem {
         format!("{:?}", self.rect_anchor).hash(hasher);
         hasher.finish()
     }
-
     fn generate_id(&mut self) -> u64 {
         self.id = None;
         let hasher = &mut DefaultHasher::new();
@@ -149,14 +212,14 @@ impl ImItem {
     }
 }
 
-impl std::hash::Hash for ImItem {
+impl std::hash::Hash for PicoItem {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.spatial_id.unwrap().hash(state)
     }
 }
 
-impl PartialEq for ImItem {
-    fn eq(&self, other: &ImItem) -> bool {
+impl PartialEq for PicoItem {
+    fn eq(&self, other: &PicoItem) -> bool {
         self.spatial_id.unwrap() == other.spatial_id.unwrap()
     }
 }
@@ -164,64 +227,75 @@ impl PartialEq for ImItem {
 #[derive(Resource, Default)]
 pub struct Pico {
     pub cache: HashMap<u64, CacheItem>,
-    pub items: Vec<ImItem>,
+    pub items: Vec<PicoItem>,
+    pub interacting: bool,
 }
 
 impl Pico {
-    pub fn get_hovered(&self) -> Option<&CacheItem> {
-        if let Some(item) = self.items.last() {
-            if !item.button {
-                return None;
-            }
-            if let Some(cache_item) = self.cache.get(&item.spatial_id.unwrap()) {
-                if cache_item.hover {
-                    return Some(cache_item);
-                }
+    pub fn get_hovered(&self, index: usize) -> Option<&CacheItem> {
+        let item = self.get(index);
+        if let Some(cache_item) = self.cache.get(&item.spatial_id.unwrap()) {
+            if cache_item.hover {
+                return Some(cache_item);
             }
         }
+
         None
     }
-    pub fn clicked(&self) -> bool {
-        if let Some(cache_item) = self.get_hovered() {
+    pub fn clicked(&self, index: usize) -> bool {
+        if let Some(cache_item) = self.get_hovered(index) {
             if let Some(input) = &cache_item.input {
                 return input.just_pressed(MouseButton::Left);
             }
         }
         false
     }
-    pub fn released(&self) -> bool {
-        if let Some(cache_item) = self.get_hovered() {
+    pub fn released(&self, index: usize) -> bool {
+        if let Some(cache_item) = self.get_hovered(index) {
             if let Some(input) = &cache_item.input {
                 return input.just_released(MouseButton::Left);
             }
         }
         false
     }
-    pub fn hovered(&self) -> bool {
-        self.get_hovered().is_some()
+    pub fn hovered(&self, index: usize) -> bool {
+        self.get_hovered(index).is_some()
     }
-    pub fn dragged(&self) -> Option<Drag> {
-        if let Some(item) = self.items.last() {
-            if let Some(cache_item) = self.cache.get(&item.spatial_id.unwrap()) {
-                return cache_item.drag;
-            }
+    pub fn dragged(&self, index: usize) -> Option<Drag> {
+        if let Some(cache_item) = self.cache.get(&self.get(index).spatial_id.unwrap()) {
+            return cache_item.drag;
         }
         None
     }
-    pub fn add(&mut self, mut item: ImItem) -> &mut Self {
+    pub fn add(&mut self, mut item: PicoItem) -> &mut Self {
         if item.spatial_id.is_none() {
             item.spatial_id = Some(item.generate_spatial_id());
         }
         self.items.push(item);
         self
     }
-    pub fn storage(&mut self) -> Option<&mut Option<Box<dyn std::any::Any + Send + Sync>>> {
-        if let Some(item) = self.items.last() {
-            if let Some(cache_item) = self.cache.get_mut(&item.spatial_id.unwrap()) {
-                return Some(&mut cache_item.storage);
-            }
+    pub fn get_mut(&mut self, index: usize) -> &mut PicoItem {
+        if index >= self.items.len() {
+            panic!(
+                "Tried to access item {} but there are only {}",
+                index,
+                self.items.len()
+            );
         }
-        None
+        &mut self.items[index]
+    }
+    pub fn get(&self, index: usize) -> &PicoItem {
+        if index >= self.items.len() {
+            panic!(
+                "Tried to access item {} but there are only {}",
+                index,
+                self.items.len()
+            );
+        }
+        &self.items[index]
+    }
+    pub fn last(&self) -> usize {
+        (self.items.len() - 1).max(0)
     }
 }
 
@@ -246,21 +320,20 @@ pub struct CacheItem {
     pub entity: Option<Entity>,
     pub life: f32,
     pub hover: bool,
-    pub button: bool,
+    pub interactable: bool,
     pub drag: Option<Drag>,
     pub id: u64,
     pub input: Option<Input<MouseButton>>,
-    pub storage: Option<Box<dyn std::any::Any + Send + Sync>>,
 }
 
 #[derive(Component)]
 pub struct ImEntity;
 
 #[allow(clippy::too_many_arguments)]
-pub fn render_imtext(
+fn render(
     mut commands: Commands,
     time: Res<Time>,
-    item_entities: Query<(Entity, &ImItem)>,
+    item_entities: Query<(Entity, &PicoItem)>,
     camera: Query<(&Camera, &GlobalTransform), With<ImTextCamera>>,
     windows: Query<&Window>,
     mut state: ResMut<Pico>,
@@ -277,6 +350,7 @@ pub fn render_imtext(
     let window_size = Vec2::new(window.width(), window.height());
 
     *currently_dragging = false;
+    let mut interacting = false;
     // Age all the cached items
     for (_, cache_item) in state.cache.iter_mut() {
         cache_item.life -= time.delta_seconds();
@@ -285,6 +359,7 @@ pub fn render_imtext(
         if mouse_button_input.pressed(MouseButton::Left) {
             if cache_item.drag.is_some() {
                 *currently_dragging = true;
+                interacting = true;
             }
         } else {
             cache_item.drag = None;
@@ -293,27 +368,32 @@ pub fn render_imtext(
 
     let mut items = std::mem::take(&mut state.items);
 
-    // Move ImItem entites to local set
+    // Move PicoItem entites to local set
     for (imtext_entity, item) in &item_entities {
         items.push(item.clone());
         commands.entity(imtext_entity).despawn();
     }
 
-    for impico in &mut items {
-        if impico.id.is_none() {
-            impico.id = Some(impico.generate_id());
-        }
-        if impico.spatial_id.is_none() {
-            impico.spatial_id = Some(impico.generate_spatial_id());
-        }
-        let spatial_id = impico.spatial_id.unwrap();
+    // Sort so we interact in z order.
+    items.sort_by(|a, b| a.position.z.partial_cmp(&b.position.z).unwrap());
 
-        let text_ndc = if impico.position_3d {
+    let mut first_interact_found = false;
+
+    for item in &mut items {
+        if item.id.is_none() {
+            item.id = Some(item.generate_id());
+        }
+        if item.spatial_id.is_none() {
+            item.spatial_id = Some(item.generate_spatial_id());
+        }
+        let spatial_id = item.spatial_id.unwrap();
+
+        let text_ndc = if item.position_3d {
             camera
-                .world_to_ndc(camera_transform, impico.position)
+                .world_to_ndc(camera_transform, item.position)
                 .unwrap_or(Vec3::NAN)
         } else {
-            ((impico.position.xy() - Vec2::splat(0.5)) * vec2(2.0, -2.0)).extend(impico.position.z)
+            ((item.position.xy() - Vec2::splat(0.5)) * vec2(2.0, -2.0)).extend(item.position.z)
         };
 
         let text_pos = text_ndc.xy() * window_size * 0.5;
@@ -326,14 +406,15 @@ pub fn render_imtext(
                 continue;
             };
             trans.translation = text_pos.extend(text_ndc.z);
-            if !existing_cache_item.button {
+
+            if !existing_cache_item.interactable {
                 continue;
             }
 
             if let Some(sprite) = sprite {
                 if let Some(custom_size) = sprite.custom_size {
                     if let Some(cursor_pos) = window.cursor_position() {
-                        if mouse_button_input.pressed(MouseButton::Left) {
+                        if mouse_button_input.pressed(MouseButton::Left) && !first_interact_found {
                             if let Some(drag) = &mut existing_cache_item.drag {
                                 drag.last_frame = drag.end;
                                 drag.end = cursor_pos;
@@ -345,22 +426,32 @@ pub fn render_imtext(
                         let b = xy + half_size + custom_size * -sprite.anchor.as_vec();
                         if cursor_pos.cmpge(a).all() && cursor_pos.cmple(b).all() {
                             existing_cache_item.hover = true;
-                            existing_cache_item.input = Some(mouse_button_input.clone());
-                            if mouse_button_input.pressed(MouseButton::Left)
-                                && !*currently_dragging
-                                && existing_cache_item.drag.is_none()
-                            {
-                                existing_cache_item.drag = Some(Drag {
-                                    start: cursor_pos,
-                                    end: cursor_pos,
-                                    last_frame: cursor_pos,
-                                });
+                            if !first_interact_found {
+                                existing_cache_item.input = Some(mouse_button_input.clone());
+                                if mouse_button_input.any_just_pressed([
+                                    MouseButton::Left,
+                                    MouseButton::Right,
+                                    MouseButton::Middle,
+                                ]) {
+                                    interacting = true;
+                                    first_interact_found = true;
+                                }
+                                if mouse_button_input.just_pressed(MouseButton::Left)
+                                    && !*currently_dragging
+                                    && existing_cache_item.drag.is_none()
+                                {
+                                    existing_cache_item.drag = Some(Drag {
+                                        start: cursor_pos,
+                                        end: cursor_pos,
+                                        last_frame: cursor_pos,
+                                    });
+                                }
                             }
                         }
                     }
                 }
             }
-            existing_cache_item.id != impico.id.unwrap()
+            existing_cache_item.id != item.id.unwrap()
         } else {
             true
         };
@@ -377,24 +468,24 @@ pub fn render_imtext(
             };
             let text = Text {
                 sections: vec![TextSection::new(
-                    impico.text.clone(),
+                    item.text.clone(),
                     TextStyle {
-                        font_size: impico.font_size * window_size.y,
-                        color: impico.color,
+                        font_size: item.font_size * window_size.y,
+                        color: item.color,
                         ..default()
                     },
                 )],
-                alignment: impico.alignment,
+                alignment: item.alignment,
                 linebreak_behavior: BreakLineOn::WordBoundary,
             };
-            cache_item.life = impico.life;
-            cache_item.id = impico.id.unwrap();
-            if impico.rect.x.is_finite() && impico.rect.y.is_finite() {
-                let rect = impico.rect * window_size;
+            cache_item.life = item.life;
+            cache_item.id = item.id.unwrap();
+            if item.rect.x.is_finite() && item.rect.y.is_finite() {
+                let rect = item.rect * window_size;
                 let sprite = Sprite {
-                    color: impico.background,
+                    color: item.background,
                     custom_size: Some(rect),
-                    anchor: impico.rect_anchor.clone(),
+                    anchor: item.rect_anchor.clone(),
                     ..default()
                 };
                 let trans = Transform::from_translation(text_pos.extend(1.0));
@@ -410,9 +501,9 @@ pub fn render_imtext(
                     .with_children(|builder| {
                         builder.spawn(Text2dBundle {
                             text,
-                            text_anchor: impico.anchor.clone(),
+                            text_anchor: item.anchor.clone(),
                             transform: Transform::from_translation(
-                                (rect * -(impico.rect_anchor.as_vec() - impico.anchor.as_vec()))
+                                (rect * -(item.rect_anchor.as_vec() - item.anchor.as_vec()))
                                     .extend(0.001),
                             ),
                             text_2d_bounds: Text2dBounds { size: rect },
@@ -420,13 +511,13 @@ pub fn render_imtext(
                         });
                     })
                     .id();
-                cache_item.button = impico.button;
+                cache_item.interactable = true;
                 cache_item.entity = Some(entity);
             } else {
                 let entity = commands
                     .spawn(Text2dBundle {
                         text,
-                        text_anchor: impico.anchor.clone(),
+                        text_anchor: item.anchor.clone(),
                         transform: Transform::from_translation(text_pos.extend(1.0)),
                         ..default()
                     })
@@ -446,4 +537,5 @@ pub fn render_imtext(
 
     // clean up cache
     state.cache.retain(|_, cache_item| cache_item.life >= 0.0);
+    state.interacting = interacting;
 }
