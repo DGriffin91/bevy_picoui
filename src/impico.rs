@@ -8,7 +8,13 @@ use bevy::{
 };
 use core::hash::Hash;
 use core::hash::Hasher;
-use std::collections::hash_map::DefaultHasher;
+use std::{
+    collections::hash_map::DefaultHasher,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 use bevy::utils::HashMap;
 
@@ -109,15 +115,16 @@ pub fn drag_value(
     // If were in a vstack, roll it back so we are on the same row
     pico.vstack_end = vstack_end;
     let pico = pico.add(b);
-    let dragging = if let Some(dragged) = pico.dragged(drag_index) {
-        pico.items.last_mut().unwrap().text = format!("{:.2}", dragged.total_delta().x * scale);
-        value = dragged.delta().x * scale + value;
-        true
-    } else {
-        false
+    let mut dragging = false;
+    if let Some(state) = pico.get_state(drag_index) {
+        if let Some(drag) = state.drag {
+            pico.items.last_mut().unwrap().text = format!("{:.2}", drag.total_delta().x * scale);
+            value = drag.delta().x * scale + value;
+            dragging = true;
+        }
     };
     let a = if pico.hovered(drag_index) || dragging {
-        0.03
+        0.035
     } else {
         0.01
     };
@@ -227,43 +234,67 @@ impl PartialEq for PicoItem {
     }
 }
 
+#[derive(Default, Clone)]
+pub struct Guard(Arc<AtomicBool>);
+
+impl Guard {
+    pub fn set(&self, val: bool) {
+        self.0.store(val, Ordering::Relaxed)
+    }
+    pub fn get(&self) -> bool {
+        self.0.load(Ordering::Relaxed)
+    }
+}
+impl Drop for Guard {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Relaxed)
+    }
+}
+
 #[derive(Resource, Default)]
 pub struct Pico {
-    pub cache: HashMap<u64, CacheItem>,
+    pub state: HashMap<u64, StateItem>,
     pub items: Vec<PicoItem>,
     pub interacting: bool,
-    pub vstack_end: Option<f32>,
+    pub vstack_enabled: Guard,
+    pub vstack_end: f32,
     pub vstack_margin: f32,
-    pub hstack_end: Option<f32>,
+    pub hstack_enabled: Guard,
+    pub hstack_end: f32,
     pub hstack_margin: f32,
     pub window_size: Vec2,
+    pub window_ratio_mode_enabled: Guard,
+    pub window_ratio: f32,
+    // The right edge of the window when using ratio mode
+    pub window_ratio_right: f32,
 }
 
 impl Pico {
-    pub fn vstack(&mut self, start: f32, margin: f32) {
-        self.vstack_end = Some(start);
+    pub fn vstack(&mut self, start: f32, margin: f32) -> Guard {
+        self.vstack_end = start;
         self.vstack_margin = margin;
+        self.vstack_enabled.set(true);
+        self.vstack_enabled.clone()
     }
-    pub fn hstack(&mut self, start: f32, margin: f32) {
-        self.hstack_end = Some(start);
+    pub fn hstack(&mut self, start: f32, margin: f32) -> Guard {
+        self.hstack_end = start;
         self.hstack_margin = margin;
+        self.hstack_enabled.set(true);
+        self.hstack_enabled.clone()
     }
-    pub fn end_vstack(&mut self) {
-        self.vstack_end = None;
-        self.vstack_margin = 0.0;
+    /// For keeping items horizontally proportional.
+    /// 2d x coords are mapped so that when x is 1 it is the same distance in pixels as when y is 1
+    /// Use with window_ratio_right to find the right edge of the window
+    pub fn window_ratio_mode(&mut self) -> Guard {
+        self.window_ratio_mode_enabled.set(true);
+        self.window_ratio_mode_enabled.clone()
     }
-    pub fn end_hstack(&mut self) {
-        self.hstack_end = None;
-        self.hstack_margin = 0.0;
-    }
-    pub fn get_hovered(&self, index: usize) -> Option<&CacheItem> {
-        let item = self.get(index);
-        if let Some(cache_item) = self.cache.get(&item.spatial_id.unwrap()) {
+    pub fn get_hovered(&self, index: usize) -> Option<&StateItem> {
+        if let Some(cache_item) = self.get_state(index) {
             if cache_item.hover {
                 return Some(cache_item);
             }
         }
-
         None
     }
     pub fn clicked(&self, index: usize) -> bool {
@@ -283,7 +314,7 @@ impl Pico {
         false
     }
     pub fn bbox(&self, index: usize) -> Vec4 {
-        if let Some(cache_item) = self.cache.get(&self.get(index).spatial_id.unwrap()) {
+        if let Some(cache_item) = self.get_state(index) {
             return cache_item.bbox;
         }
         Vec4::ZERO
@@ -291,28 +322,36 @@ impl Pico {
     pub fn hovered(&self, index: usize) -> bool {
         self.get_hovered(index).is_some()
     }
-    pub fn dragged(&self, index: usize) -> Option<Drag> {
-        if let Some(cache_item) = self.cache.get(&self.get(index).spatial_id.unwrap()) {
-            return cache_item.drag;
-        }
-        None
-    }
     pub fn add(&mut self, mut item: PicoItem) -> &mut Self {
-        if let Some(vstack_end) = &mut self.vstack_end {
-            item.position.y += *vstack_end + self.vstack_margin;
-            *vstack_end =
-                vstack_end.max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).w);
+        if self.vstack_enabled.get() {
+            item.position.y += self.vstack_end + self.vstack_margin;
+            self.vstack_end = self
+                .vstack_end
+                .max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).w);
         }
-        if let Some(hstack_end) = &mut self.hstack_end {
-            item.position.x += *hstack_end + self.hstack_margin;
-            *hstack_end =
-                hstack_end.max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).z);
+        if self.hstack_enabled.get() {
+            item.position.x += self.hstack_end + self.hstack_margin;
+            self.hstack_end = self
+                .hstack_end
+                .max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).z);
+        }
+        if self.window_ratio_mode_enabled.get() {
+            if !item.position_3d {
+                item.position.x *= self.window_ratio;
+            }
+            item.rect.x *= self.window_ratio;
         }
         if item.spatial_id.is_none() {
             item.spatial_id = Some(item.generate_spatial_id());
         }
         self.items.push(item);
         self
+    }
+    pub fn get_state_mut(&mut self, index: usize) -> Option<&mut StateItem> {
+        self.state.get_mut(&self.get(index).spatial_id.unwrap())
+    }
+    pub fn get_state(&self, index: usize) -> Option<&StateItem> {
+        self.state.get(&self.get(index).spatial_id.unwrap())
     }
     pub fn get_mut(&mut self, index: usize) -> &mut PicoItem {
         if index >= self.items.len() {
@@ -356,11 +395,12 @@ impl Drag {
 }
 
 #[derive(Debug, Default)]
-pub struct CacheItem {
+pub struct StateItem {
     pub entity: Option<Entity>,
     pub life: f32,
     pub hover: bool,
     pub interactable: bool,
+    pub toggle_state: bool,
     pub drag: Option<Drag>,
     pub id: u64,
     pub input: Option<Input<MouseButton>>,
@@ -393,7 +433,7 @@ fn render(
     *currently_dragging = false;
     let mut interacting = false;
     // Age all the cached items
-    for (_, cache_item) in pico.cache.iter_mut() {
+    for (_, cache_item) in pico.state.iter_mut() {
         cache_item.life -= time.delta_seconds();
         cache_item.hover = false;
         cache_item.input = None;
@@ -439,7 +479,7 @@ fn render(
 
         let text_pos = text_ndc.xy() * window_size * 0.5;
 
-        let generate = if let Some(existing_cache_item) = pico.cache.get_mut(&spatial_id) {
+        let generate = if let Some(existing_cache_item) = pico.state.get_mut(&spatial_id) {
             // If a ImText in the cache matches one created this frame keep it around
             existing_cache_item.life = existing_cache_item.life.max(0.0);
             let Ok((mut trans, sprite)) = text_entites.get_mut(existing_cache_item.entity.unwrap())
@@ -500,15 +540,15 @@ fn render(
             true
         };
         if generate || pico.window_size != window_size {
-            let cache_item = if let Some(old_cache_item) = pico.cache.get_mut(&spatial_id) {
+            let cache_item = if let Some(old_cache_item) = pico.state.get_mut(&spatial_id) {
                 let entity = old_cache_item.entity.unwrap();
                 if text_entites.get(entity).is_ok() {
                     commands.entity(entity).despawn_recursive();
                 }
                 old_cache_item
             } else {
-                pico.cache.insert(spatial_id, CacheItem::default());
-                pico.cache.get_mut(&spatial_id).unwrap()
+                pico.state.insert(spatial_id, StateItem::default());
+                pico.state.get_mut(&spatial_id).unwrap()
             };
             let text = Text {
                 sections: vec![TextSection::new(
@@ -576,7 +616,7 @@ fn render(
         }
     }
 
-    for (_, cache_item) in pico.cache.iter_mut() {
+    for (_, cache_item) in pico.state.iter_mut() {
         let entity = cache_item.entity.unwrap();
         // Remove cached ImTexts that are no longer in use
         if cache_item.life < 0.0 && text_entites.get(entity).is_ok() {
@@ -585,9 +625,11 @@ fn render(
     }
 
     // clean up cache
-    pico.cache.retain(|_, cache_item| cache_item.life >= 0.0);
+    pico.state.retain(|_, cache_item| cache_item.life >= 0.0);
     pico.interacting = interacting;
     pico.window_size = window_size;
+    pico.window_ratio = window_size.y / window_size.x;
+    pico.window_ratio_right = window_size.x / window_size.y;
 }
 
 fn get_bbox(rect: Vec2, uv_position: Vec2, anchor: &Anchor) -> Vec4 {
