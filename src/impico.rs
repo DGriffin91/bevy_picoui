@@ -54,14 +54,9 @@ fn setup_default_cam(mut commands: Commands, order: Res<CreateDefaultCamWithOrde
 // Button example widget
 // -------------------------
 
-pub fn button(pico: &mut Pico, position: Vec3, rect: Vec2, text: &str) -> usize {
+pub fn button(pico: &mut Pico, item: PicoItem) -> usize {
     let button_index = pico.items.len();
-    let pico = pico.add(PicoItem {
-        text: text.to_string(),
-        position,
-        rect,
-        ..default()
-    });
+    let pico = pico.add(item);
     let a = if pico.hovered(button_index) {
         0.03
     } else {
@@ -90,6 +85,7 @@ pub fn drag_value(
     label: &str,
     scale: f32,
     value: f32,
+    parent: Option<usize>,
 ) -> DragValue {
     let mut value = value;
     let vstack_end = pico.vstack_end;
@@ -100,6 +96,7 @@ pub fn drag_value(
         rect: vec2(label_width, height),
         anchor: Anchor::CenterLeft,
         rect_anchor: Anchor::TopLeft,
+        parent,
         ..default()
     });
 
@@ -107,6 +104,7 @@ pub fn drag_value(
         text: format!("{:.2}", value),
         position: position + Vec3::X * label_width,
         rect: vec2(drag_width, height),
+        parent,
         ..default()
     };
 
@@ -145,9 +143,11 @@ pub struct PicoItem {
     pub text: String,
     /// If position_3d is false position is the screen uv coords with 0.0, 0.0 at top left
     /// If position_3d is true position is the world space translation
+    /// Don't change after pico.add()
     pub position: Vec3,
     pub position_3d: bool,
-    // 2d pixel coords. Text will center in rect if it is not Vec2::INFINITY.
+    /// 2d pixel coords. Text will center in rect if it is not Vec2::INFINITY.
+    /// Don't change after pico.add()
     pub rect: Vec2,
     pub font_size: f32,
     pub color: Color,
@@ -159,8 +159,13 @@ pub struct PicoItem {
     pub button: bool,
     /// If life is 0.0, it will only live one frame (default), if life is f32::INFINITY it will live forever.
     pub life: f32,
+    /// If the id changes, the item is re-rendered
     pub id: Option<u64>,
+    /// If the spatial_id changes a new state is used
+    /// Impacted by position, rect, rect_anchor (after transform from parent is applied, if any)
     pub spatial_id: Option<u64>,
+    /// If set, coordinates for position/rect will be relative to parent.
+    pub parent: Option<usize>,
 }
 
 impl Default for PicoItem {
@@ -180,6 +185,7 @@ impl Default for PicoItem {
             life: 0.0,
             id: None,
             spatial_id: None,
+            parent: None,
         }
     }
 }
@@ -234,6 +240,10 @@ impl PartialEq for PicoItem {
     }
 }
 
+fn lerp(start: Vec2, end: Vec2, t: Vec2) -> Vec2 {
+    (1.0 - t) * start + t * end
+}
+
 #[derive(Default, Clone)]
 pub struct Guard(Arc<AtomicBool>);
 
@@ -249,6 +259,12 @@ impl Drop for Guard {
     fn drop(&mut self) {
         self.0.store(false, Ordering::Relaxed)
     }
+}
+
+pub struct Stack {
+    pub stack_end: f32,
+    pub stack_margin: f32,
+    pub direction: bool,
 }
 
 #[derive(Resource, Default)]
@@ -314,8 +330,13 @@ impl Pico {
         false
     }
     pub fn bbox(&self, index: usize) -> Vec4 {
-        if let Some(cache_item) = self.get_state(index) {
-            return cache_item.bbox;
+        let item = self.get(index);
+        if item.position_3d {
+            if let Some(state_item) = self.get_state(index) {
+                return state_item.bbox;
+            }
+        } else {
+            return get_bbox(item.rect, item.position.xy(), &item.rect_anchor);
         }
         Vec4::ZERO
     }
@@ -323,23 +344,41 @@ impl Pico {
         self.get_hovered(index).is_some()
     }
     pub fn add(&mut self, mut item: PicoItem) -> &mut Self {
-        if self.vstack_enabled.get() {
-            item.position.y += self.vstack_end + self.vstack_margin;
-            self.vstack_end = self
-                .vstack_end
-                .max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).w);
-        }
-        if self.hstack_enabled.get() {
-            item.position.x += self.hstack_end + self.hstack_margin;
-            self.hstack_end = self
-                .hstack_end
-                .max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).z);
+        if !item.position_3d {
+            if self.vstack_enabled.get() {
+                item.position.y += self.vstack_end + self.vstack_margin;
+                self.vstack_end = self
+                    .vstack_end
+                    .max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).w);
+            }
+            if self.hstack_enabled.get() {
+                item.position.x += self.hstack_end + self.hstack_margin;
+                self.hstack_end = self
+                    .hstack_end
+                    .max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).z);
+            }
+            if let Some(parent) = item.parent {
+                let parent_2d_bbox = self.bbox(parent);
+                let parent_z = self.get(parent).position.z;
+                item.position.z += parent_z;
+                if item.position.z == parent_z {
+                    // Make sure child is in front of parent if they were at the same z
+                    item.position.z -= 0.000001;
+                }
+                item.position = lerp(parent_2d_bbox.xy(), parent_2d_bbox.zw(), item.position.xy())
+                    .extend(item.position.z);
+                item.rect *= (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
+            }
         }
         if self.window_ratio_mode_enabled.get() {
             if !item.position_3d {
-                item.position.x *= self.window_ratio;
+                if item.parent.is_none() {
+                    item.position.x *= self.window_ratio;
+                }
             }
-            item.rect.x *= self.window_ratio;
+            if item.parent.is_none() {
+                item.rect.x *= self.window_ratio;
+            }
         }
         if item.spatial_id.is_none() {
             item.spatial_id = Some(item.generate_spatial_id());
@@ -408,7 +447,7 @@ pub struct StateItem {
 }
 
 #[derive(Component)]
-pub struct ImEntity;
+pub struct PicoEntity(u64);
 
 #[allow(clippy::too_many_arguments)]
 fn render(
@@ -418,7 +457,7 @@ fn render(
     camera: Query<(&Camera, &GlobalTransform), With<ImTextCamera>>,
     windows: Query<&Window>,
     mut pico: ResMut<Pico>,
-    mut text_entites: Query<(&mut Transform, Option<&Sprite>), With<ImEntity>>,
+    mut pico_entites: Query<(Entity, &mut Transform, Option<&Sprite>, &PicoEntity)>,
     mouse_button_input: Res<Input<MouseButton>>,
     mut currently_dragging: Local<bool>,
 ) {
@@ -482,7 +521,8 @@ fn render(
         let generate = if let Some(existing_cache_item) = pico.state.get_mut(&spatial_id) {
             // If a ImText in the cache matches one created this frame keep it around
             existing_cache_item.life = existing_cache_item.life.max(0.0);
-            let Ok((mut trans, sprite)) = text_entites.get_mut(existing_cache_item.entity.unwrap())
+            let Ok((_, mut trans, sprite, _)) =
+                pico_entites.get_mut(existing_cache_item.entity.unwrap())
             else {
                 continue;
             };
@@ -542,7 +582,7 @@ fn render(
         if generate || pico.window_size != window_size {
             let cache_item = if let Some(old_cache_item) = pico.state.get_mut(&spatial_id) {
                 let entity = old_cache_item.entity.unwrap();
-                if text_entites.get(entity).is_ok() {
+                if pico_entites.get(entity).is_ok() {
                     commands.entity(entity).despawn_recursive();
                 }
                 old_cache_item
@@ -580,7 +620,7 @@ fn render(
                             transform: trans,
                             ..default()
                         },
-                        ImEntity,
+                        PicoEntity(spatial_id),
                     ))
                     .with_children(|builder| {
                         builder.spawn(Text2dBundle {
@@ -618,8 +658,15 @@ fn render(
 
     for (_, cache_item) in pico.state.iter_mut() {
         let entity = cache_item.entity.unwrap();
-        // Remove cached ImTexts that are no longer in use
-        if cache_item.life < 0.0 && text_entites.get(entity).is_ok() {
+        // Remove that are no longer in use
+        if cache_item.life < 0.0 && pico_entites.get(entity).is_ok() {
+            commands.entity(entity).despawn_recursive();
+        }
+    }
+
+    for (entity, _, _, pico_entity) in &pico_entites {
+        // Remove any orphaned
+        if pico.state.get(&pico_entity.0).is_none() {
             commands.entity(entity).despawn_recursive();
         }
     }

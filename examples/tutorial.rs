@@ -200,16 +200,28 @@ fn update(
         return;
     };
 
+    let side_bar = pico
+        .add(PicoItem {
+            position: vec3(0.0, 0.0, 1.0),
+            rect_anchor: Anchor::TopLeft,
+            rect: vec2(0.2, 1.0),
+            alignment: TextAlignment::Left,
+            background: Color::rgba(0.2, 0.2, 0.2, 0.2),
+            ..default()
+        })
+        .last();
+
     let tdrag = |pico: &mut Pico, label: &str, value: f32| -> DragValue {
         let dv = drag_value(
             pico,
-            vec3(0.02, 0.0, 0.0),
+            vec3(0.05, 0.0, 0.0),
             0.04,
-            0.12,
-            0.08,
+            0.6,
+            0.3,
             label,
             0.01,
             value,
+            Some(side_bar),
         );
         dv
     };
@@ -219,9 +231,10 @@ fn update(
 
         pico.add(PicoItem {
             position: vec3(0.02, 0.0, 0.0),
-            rect: vec2(0.2, 0.02),
+            rect: vec2(1.0, 0.02),
             text: "- Camera -".into(),
             rect_anchor: Anchor::TopLeft,
+            parent: Some(side_bar),
             ..default()
         })
         .last();
@@ -255,10 +268,15 @@ fn update(
 
         let btn = button(
             &mut pico,
-            vec3(0.02, 0.0, 0.0),
-            vec2(0.2, 0.04),
-            "RESET CAMERA",
+            PicoItem {
+                position: vec3(0.05, 0.0, 0.0),
+                rect: vec2(0.9, 0.04),
+                text: "RESET CAMERA".to_string(),
+                parent: Some(side_bar),
+                ..default()
+            },
         );
+
         pico.get_mut(btn).rect_anchor = Anchor::TopLeft;
         if pico.clicked(btn) {
             *trans = get_default_cam_trans();
