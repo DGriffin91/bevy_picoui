@@ -202,22 +202,10 @@ fn update(
         return;
     };
 
-    pico.add(PicoItem {
-        position: vec3(0.01, 0.15, 0.0),
-        rect: vec2(0.1, 0.02),
-        text: "- Camera -".into(),
-        rect_anchor: Anchor::TopLeft,
-        ..default()
-    })
-    .last();
-
-    let margin = 0.01;
-    let x = 0.01;
-
     let tdrag = |pico: &mut Pico, label: &str, value: f32| -> DragValue {
         let dv = drag_value(
             pico,
-            vec3(x, pico.bbox(pico.last()).w + margin, 0.0),
+            vec3(0.01, 0.0, 0.0),
             0.04,
             0.06,
             0.04,
@@ -227,6 +215,17 @@ fn update(
         );
         dv
     };
+
+    pico.vstack(0.15, 0.01);
+
+    pico.add(PicoItem {
+        position: vec3(0.01, 0.0, 0.0),
+        rect: vec2(0.1, 0.02),
+        text: "- Camera -".into(),
+        rect_anchor: Anchor::TopLeft,
+        ..default()
+    })
+    .last();
 
     let dv = tdrag(&mut pico, "Local X", 0.0);
     pico.get_mut(dv.drag_index).background += Color::rgba(0.0, -0.5, -0.5, 0.05); // Need * for color
@@ -257,7 +256,7 @@ fn update(
 
     let btn = button(
         &mut pico,
-        vec3(0.01, dv.bbox.w + margin, 0.0),
+        vec3(0.01, 0.0, 0.0),
         vec2(0.1, 0.04),
         "RESET CAMERA",
     );
@@ -265,6 +264,8 @@ fn update(
     if pico.clicked(btn) {
         *trans = get_default_cam_trans();
     }
+    pico.end_vstack();
+
     // Setup style for axis text
     let axis_text = |p: Vec3, s: &str| -> PicoItem {
         PicoItem {

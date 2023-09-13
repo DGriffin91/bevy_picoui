@@ -73,7 +73,6 @@ pub struct DragValue {
     pub value: f32,
     pub text_index: usize,
     pub drag_index: usize,
-    pub bbox: Vec4,
 }
 
 pub fn drag_value(
@@ -87,6 +86,7 @@ pub fn drag_value(
     value: f32,
 ) -> DragValue {
     let mut value = value;
+    let vstack_end = pico.vstack_end;
     let text_index = pico.items.len();
     let pico = pico.add(PicoItem {
         text: label.to_string(),
@@ -106,6 +106,8 @@ pub fn drag_value(
 
     b.rect_anchor = Anchor::TopLeft;
     let drag_index = pico.items.len();
+    // If were in a vstack, roll it back so we are on the same row
+    pico.vstack_end = vstack_end;
     let pico = pico.add(b);
     let dragging = if let Some(dragged) = pico.dragged(drag_index) {
         pico.items.last_mut().unwrap().text = format!("{:.2}", dragged.total_delta().x * scale);
@@ -120,13 +122,10 @@ pub fn drag_value(
         0.01
     };
     pico.get_mut(drag_index).background = Color::rgba(1.0, 1.0, 1.0, a);
-    let a = pico.bbox(text_index);
-    let b = pico.bbox(drag_index);
     DragValue {
         value,
         text_index,
         drag_index,
-        bbox: vec4(a.x.min(b.x), a.y.min(b.y), a.z.max(b.z), a.w.max(b.w)),
     }
 }
 
@@ -233,9 +232,30 @@ pub struct Pico {
     pub cache: HashMap<u64, CacheItem>,
     pub items: Vec<PicoItem>,
     pub interacting: bool,
+    pub vstack_end: Option<f32>,
+    pub vstack_margin: f32,
+    pub hstack_end: Option<f32>,
+    pub hstack_margin: f32,
+    pub window_size: Vec2,
 }
 
 impl Pico {
+    pub fn vstack(&mut self, start: f32, margin: f32) {
+        self.vstack_end = Some(start);
+        self.vstack_margin = margin;
+    }
+    pub fn hstack(&mut self, start: f32, margin: f32) {
+        self.hstack_end = Some(start);
+        self.hstack_margin = margin;
+    }
+    pub fn end_vstack(&mut self) {
+        self.vstack_end = None;
+        self.vstack_margin = 0.0;
+    }
+    pub fn end_hstack(&mut self) {
+        self.hstack_end = None;
+        self.hstack_margin = 0.0;
+    }
     pub fn get_hovered(&self, index: usize) -> Option<&CacheItem> {
         let item = self.get(index);
         if let Some(cache_item) = self.cache.get(&item.spatial_id.unwrap()) {
@@ -278,6 +298,16 @@ impl Pico {
         None
     }
     pub fn add(&mut self, mut item: PicoItem) -> &mut Self {
+        if let Some(vstack_end) = &mut self.vstack_end {
+            item.position.y += *vstack_end + self.vstack_margin;
+            *vstack_end =
+                vstack_end.max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).w);
+        }
+        if let Some(hstack_end) = &mut self.hstack_end {
+            item.position.x += *hstack_end + self.hstack_margin;
+            *hstack_end =
+                hstack_end.max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).z);
+        }
         if item.spatial_id.is_none() {
             item.spatial_id = Some(item.generate_spatial_id());
         }
@@ -347,7 +377,7 @@ fn render(
     item_entities: Query<(Entity, &PicoItem)>,
     camera: Query<(&Camera, &GlobalTransform), With<ImTextCamera>>,
     windows: Query<&Window>,
-    mut state: ResMut<Pico>,
+    mut pico: ResMut<Pico>,
     mut text_entites: Query<(&mut Transform, Option<&Sprite>), With<ImEntity>>,
     mouse_button_input: Res<Input<MouseButton>>,
     mut currently_dragging: Local<bool>,
@@ -363,7 +393,7 @@ fn render(
     *currently_dragging = false;
     let mut interacting = false;
     // Age all the cached items
-    for (_, cache_item) in state.cache.iter_mut() {
+    for (_, cache_item) in pico.cache.iter_mut() {
         cache_item.life -= time.delta_seconds();
         cache_item.hover = false;
         cache_item.input = None;
@@ -377,7 +407,7 @@ fn render(
         }
     }
 
-    let mut items = std::mem::take(&mut state.items);
+    let mut items = std::mem::take(&mut pico.items);
 
     // Move PicoItem entites to local set
     for (imtext_entity, item) in &item_entities {
@@ -409,7 +439,7 @@ fn render(
 
         let text_pos = text_ndc.xy() * window_size * 0.5;
 
-        let generate = if let Some(existing_cache_item) = state.cache.get_mut(&spatial_id) {
+        let generate = if let Some(existing_cache_item) = pico.cache.get_mut(&spatial_id) {
             // If a ImText in the cache matches one created this frame keep it around
             existing_cache_item.life = existing_cache_item.life.max(0.0);
             let Ok((mut trans, sprite)) = text_entites.get_mut(existing_cache_item.entity.unwrap())
@@ -469,16 +499,16 @@ fn render(
         } else {
             true
         };
-        if generate {
-            let cache_item = if let Some(old_cache_item) = state.cache.get_mut(&spatial_id) {
+        if generate || pico.window_size != window_size {
+            let cache_item = if let Some(old_cache_item) = pico.cache.get_mut(&spatial_id) {
                 let entity = old_cache_item.entity.unwrap();
                 if text_entites.get(entity).is_ok() {
                     commands.entity(entity).despawn_recursive();
                 }
                 old_cache_item
             } else {
-                state.cache.insert(spatial_id, CacheItem::default());
-                state.cache.get_mut(&spatial_id).unwrap()
+                pico.cache.insert(spatial_id, CacheItem::default());
+                pico.cache.get_mut(&spatial_id).unwrap()
             };
             let text = Text {
                 sections: vec![TextSection::new(
@@ -546,7 +576,7 @@ fn render(
         }
     }
 
-    for (_, cache_item) in state.cache.iter_mut() {
+    for (_, cache_item) in pico.cache.iter_mut() {
         let entity = cache_item.entity.unwrap();
         // Remove cached ImTexts that are no longer in use
         if cache_item.life < 0.0 && text_entites.get(entity).is_ok() {
@@ -555,8 +585,9 @@ fn render(
     }
 
     // clean up cache
-    state.cache.retain(|_, cache_item| cache_item.life >= 0.0);
-    state.interacting = interacting;
+    pico.cache.retain(|_, cache_item| cache_item.life >= 0.0);
+    pico.interacting = interacting;
+    pico.window_size = window_size;
 }
 
 fn get_bbox(rect: Vec2, uv_position: Vec2, anchor: &Anchor) -> Vec4 {
