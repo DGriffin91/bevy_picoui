@@ -202,7 +202,7 @@ fn update(
 
     let side_bar = pico
         .add(PicoItem {
-            position: vec3(0.0, 0.0, 1.0),
+            position: vec3(0.0, 0.0, 0.0),
             rect_anchor: Anchor::TopLeft,
             rect: vec2(0.2, 1.0),
             alignment: TextAlignment::Left,
@@ -228,6 +228,46 @@ fn update(
 
     {
         let _guard = pico.vstack(0.02, 0.01);
+
+        let b = pico
+            .add(PicoItem {
+                position: vec3(0.0, 0.0, 0.0),
+                rect: vec2(1.0, 0.1),
+                background: Color::RED,
+                rect_anchor: Anchor::TopLeft,
+                parent: Some(side_bar),
+                ..default()
+            })
+            .last();
+        {
+            let _guard = pico.hstack(0.0, 0.02);
+            for _ in 0..10 {
+                let c = pico
+                    .add(PicoItem {
+                        position: vec3(0.0, 0.0, 0.0),
+                        rect: vec2(0.08, 1.0),
+                        background: Color::BLUE,
+                        rect_anchor: Anchor::TopLeft,
+                        parent: Some(b),
+                        ..default()
+                    })
+                    .last();
+                {
+                    let _guard = pico.vstack(0.0, 0.04);
+                    for _ in 0..10 {
+                        pico.add(PicoItem {
+                            position: vec3(0.0, 0.0, 0.0),
+                            rect: vec2(1.0, 0.05),
+                            background: Color::GREEN,
+                            rect_anchor: Anchor::TopLeft,
+                            parent: Some(c),
+                            ..default()
+                        })
+                        .last();
+                    }
+                }
+            }
+        }
 
         pico.add(PicoItem {
             position: vec3(0.02, 0.0, 0.0),

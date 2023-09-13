@@ -11,7 +11,7 @@ use core::hash::Hasher;
 use std::{
     collections::hash_map::DefaultHasher,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicI32, Ordering},
         Arc,
     },
 };
@@ -88,7 +88,11 @@ pub fn drag_value(
     parent: Option<usize>,
 ) -> DragValue {
     let mut value = value;
-    let vstack_end = pico.vstack_end;
+    let vstack_end = pico
+        .stack_stack
+        .last_mut()
+        .and_then(|stack| Some(stack.end))
+        .unwrap_or(0.0);
     let text_index = pico.items.len();
     let pico = pico.add(PicoItem {
         text: label.to_string(),
@@ -111,7 +115,11 @@ pub fn drag_value(
     b.rect_anchor = Anchor::TopLeft;
     let drag_index = pico.items.len();
     // If were in a vstack, roll it back so we are on the same row
-    pico.vstack_end = vstack_end;
+    if let Some(stack) = pico.stack_stack.last_mut() {
+        if stack.vertical {
+            stack.end = vstack_end;
+        }
+    }
     let pico = pico.add(b);
     let mut dragging = false;
     if let Some(state) = pico.get_state(drag_index) {
@@ -245,26 +253,30 @@ fn lerp(start: Vec2, end: Vec2, t: Vec2) -> Vec2 {
 }
 
 #[derive(Default, Clone)]
-pub struct Guard(Arc<AtomicBool>);
+pub struct Guard(Arc<AtomicI32>);
 
 impl Guard {
-    pub fn set(&self, val: bool) {
-        self.0.store(val, Ordering::Relaxed)
+    pub fn push(&self) {
+        self.0.fetch_add(1, Ordering::Relaxed);
     }
-    pub fn get(&self) -> bool {
+    pub fn pop(&self) {
+        self.0.fetch_sub(1, Ordering::Relaxed);
+        self.0.fetch_max(0, Ordering::Relaxed);
+    }
+    pub fn get(&self) -> i32 {
         self.0.load(Ordering::Relaxed)
     }
 }
 impl Drop for Guard {
     fn drop(&mut self) {
-        self.0.store(false, Ordering::Relaxed)
+        self.pop()
     }
 }
 
 pub struct Stack {
-    pub stack_end: f32,
-    pub stack_margin: f32,
-    pub direction: bool,
+    pub end: f32,
+    pub margin: f32,
+    pub vertical: bool,
 }
 
 #[derive(Resource, Default)]
@@ -272,12 +284,8 @@ pub struct Pico {
     pub state: HashMap<u64, StateItem>,
     pub items: Vec<PicoItem>,
     pub interacting: bool,
-    pub vstack_enabled: Guard,
-    pub vstack_end: f32,
-    pub vstack_margin: f32,
-    pub hstack_enabled: Guard,
-    pub hstack_end: f32,
-    pub hstack_margin: f32,
+    pub stack_stack: Vec<Stack>,
+    pub stack_guard: Guard,
     pub window_size: Vec2,
     pub window_ratio_mode_enabled: Guard,
     pub window_ratio: f32,
@@ -287,22 +295,28 @@ pub struct Pico {
 
 impl Pico {
     pub fn vstack(&mut self, start: f32, margin: f32) -> Guard {
-        self.vstack_end = start;
-        self.vstack_margin = margin;
-        self.vstack_enabled.set(true);
-        self.vstack_enabled.clone()
+        self.stack_stack.push(Stack {
+            end: start,
+            margin,
+            vertical: true,
+        });
+        self.stack_guard.push();
+        self.stack_guard.clone()
     }
     pub fn hstack(&mut self, start: f32, margin: f32) -> Guard {
-        self.hstack_end = start;
-        self.hstack_margin = margin;
-        self.hstack_enabled.set(true);
-        self.hstack_enabled.clone()
+        self.stack_stack.push(Stack {
+            end: start,
+            margin,
+            vertical: false,
+        });
+        self.stack_guard.push();
+        self.stack_guard.clone()
     }
     /// For keeping items horizontally proportional.
     /// 2d x coords are mapped so that when x is 1 it is the same distance in pixels as when y is 1
     /// Use with window_ratio_right to find the right edge of the window
     pub fn window_ratio_mode(&mut self) -> Guard {
-        self.window_ratio_mode_enabled.set(true);
+        self.window_ratio_mode_enabled.push();
         self.window_ratio_mode_enabled.clone()
     }
     pub fn get_hovered(&self, index: usize) -> Option<&StateItem> {
@@ -345,17 +359,22 @@ impl Pico {
     }
     pub fn add(&mut self, mut item: PicoItem) -> &mut Self {
         if !item.position_3d {
-            if self.vstack_enabled.get() {
-                item.position.y += self.vstack_end + self.vstack_margin;
-                self.vstack_end = self
-                    .vstack_end
-                    .max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).w);
+            while (self.stack_guard.get() as usize) < self.stack_stack.len() {
+                self.stack_stack.pop();
             }
-            if self.hstack_enabled.get() {
-                item.position.x += self.hstack_end + self.hstack_margin;
-                self.hstack_end = self
-                    .hstack_end
-                    .max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).z);
+            if !self.stack_stack.is_empty() {
+                let stack = self.stack_stack.last_mut().unwrap();
+                if stack.vertical {
+                    item.position.y += stack.end + stack.margin;
+                    stack.end = stack
+                        .end
+                        .max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).w);
+                } else {
+                    item.position.x += stack.end + stack.margin;
+                    stack.end = stack
+                        .end
+                        .max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).z);
+                }
             }
             if let Some(parent) = item.parent {
                 let parent_2d_bbox = self.bbox(parent);
@@ -363,14 +382,14 @@ impl Pico {
                 item.position.z += parent_z;
                 if item.position.z == parent_z {
                     // Make sure child is in front of parent if they were at the same z
-                    item.position.z -= 0.000001;
+                    item.position.z += 0.000001;
                 }
                 item.position = lerp(parent_2d_bbox.xy(), parent_2d_bbox.zw(), item.position.xy())
                     .extend(item.position.z);
                 item.rect *= (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
             }
         }
-        if self.window_ratio_mode_enabled.get() {
+        if self.window_ratio_mode_enabled.get() > 0 {
             if !item.position_3d {
                 if item.parent.is_none() {
                     item.position.x *= self.window_ratio;
