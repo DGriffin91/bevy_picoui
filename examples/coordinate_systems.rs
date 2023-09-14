@@ -16,7 +16,7 @@ use bevy::{
 
 use bevy_basic_camera::{CameraController, CameraControllerPlugin};
 use bevy_coordinate_systems::{CoordinateTransformationsPlugin, View};
-use bevy_picoui::{button, drag_value, DragValue, Pico, Pico2dCamera, PicoItem, PicoPlugin};
+use bevy_picoui::{button, drag_value, hr, DragValue, Pico, Pico2dCamera, PicoItem, PicoPlugin};
 
 fn get_default_cam_trans() -> Transform {
     Transform::from_xyz(3.0, 2.5, 3.0).looking_at(Vec3::ZERO, Vec3::Y)
@@ -217,7 +217,7 @@ fn update(
                 pico,
                 bg,
                 vec3(0.05, 0.0, 0.0),
-                0.04,
+                0.025,
                 0.6,
                 0.3,
                 label,
@@ -240,16 +240,17 @@ fn update(
 
     {
         let _guard = pico.vstack(0.02, 0.01);
-
         pico.add(PicoItem {
             position: vec3(0.02, 0.0, 0.0),
-            rect: vec2(1.0, 0.02),
-            text: "- Camera -".into(),
+            rect: vec2(1.0, 0.03),
+            text: "Camera".into(),
             rect_anchor: Anchor::TopLeft,
             parent: Some(side_bar),
             ..default()
         })
         .last();
+
+        hr(&mut pico, 0.95, 0.002, side_bar);
 
         let dv = tdrag(&mut pico, RED, "Local X", 0.0, true);
         let v = trans.right();
@@ -263,6 +264,8 @@ fn update(
         let v = trans.up();
         trans.translation += v * dv.value;
 
+        hr(&mut pico, 0.95, 0.002, side_bar);
+
         let dv = tdrag(&mut pico, RED, "World X", trans.translation.x, false);
         trans.translation.x = dv.value;
 
@@ -271,6 +274,8 @@ fn update(
 
         let dv = tdrag(&mut pico, BLUE, "World Z", trans.translation.z, false);
         trans.translation.z = dv.value;
+
+        hr(&mut pico, 0.95, 0.002, side_bar);
 
         let btn = button(
             &mut pico,

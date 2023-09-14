@@ -1,7 +1,7 @@
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
     input::InputSystem,
-    math::{vec2, vec4, Vec3Swizzles, Vec4Swizzles},
+    math::{vec2, vec3, vec4, Vec3Swizzles, Vec4Swizzles},
     prelude::*,
     sprite::Anchor,
     text::{BreakLineOn, Text2dBounds},
@@ -90,6 +90,25 @@ pub fn toggle_button(
     } else {
         c
     };
+    index
+}
+
+// -------------------------
+// Horizontal ruler example widget
+// -------------------------
+
+/// Width is relative to parent, height is relative to window height (so that the height is consistent for all parents)
+pub fn hr(pico: &mut Pico, width: f32, height: f32, parent: usize) -> usize {
+    let height = pico.window_uv_for_parent(vec2(0.0, height), parent).y;
+    let index = pico.last();
+    pico.add(PicoItem {
+        position: vec3(0.5, 0.0, 0.0),
+        rect: vec2(width, height),
+        background: Color::rgba(1.0, 1.0, 1.0, 0.04),
+        rect_anchor: Anchor::TopCenter,
+        parent: Some(parent),
+        ..default()
+    });
     index
 }
 
@@ -278,6 +297,8 @@ pub struct PicoItem {
     pub spatial_id: Option<u64>,
     /// If set, coordinates for position/rect will be relative to parent.
     pub parent: Option<usize>,
+    // Coordinates are uv space 0..1 over the whole window
+    pub computed_bbox: Option<Vec4>,
 }
 
 impl Default for PicoItem {
@@ -298,6 +319,7 @@ impl Default for PicoItem {
             id: None,
             spatial_id: None,
             parent: None,
+            computed_bbox: None,
         }
     }
 }
@@ -446,14 +468,16 @@ impl Pico {
     }
     pub fn bbox(&self, index: usize) -> Vec4 {
         let item = self.get(index);
-        if item.position_3d {
-            if let Some(state_item) = self.get_state(index) {
-                return state_item.bbox;
-            }
-        } else {
-            return get_bbox(item.rect, item.position.xy(), &item.rect_anchor);
+        if let Some(computed_bbox) = item.computed_bbox {
+            return computed_bbox;
         }
-        Vec4::ZERO
+        vec4(0.0, 0.0, 1.0, 1.0)
+    }
+    /// Take a uv for relative to the window (0.0, 0.0 at top left, 1.0, 1.0 bottom right)
+    /// And get the corresponding uv inside the given parent
+    pub fn window_uv_for_parent(&self, window_uv: Vec2, parent: usize) -> Vec2 {
+        let bbox = self.bbox(parent);
+        (window_uv - bbox.xy()) / (bbox.zw() - bbox.xy()).abs()
     }
     pub fn hovered(&self, index: usize) -> bool {
         self.get_hovered(index).is_some()
@@ -493,6 +517,15 @@ impl Pico {
         if item.spatial_id.is_none() {
             item.spatial_id = Some(item.generate_spatial_id());
         }
+        item.computed_bbox = Some(if item.position_3d {
+            if let Some(state_item) = self.state.get(&item.spatial_id.unwrap()) {
+                state_item.bbox
+            } else {
+                Vec4::ZERO
+            }
+        } else {
+            get_bbox(item.rect, item.position.xy(), &item.rect_anchor)
+        });
         self.items.push(item);
         self
     }
@@ -561,6 +594,7 @@ pub struct StateItem {
     pub drag: Option<Drag>,
     pub id: u64,
     pub input: Option<Input<MouseButton>>,
+    // Coordinates are uv space 0..1 over the whole window
     pub bbox: Vec4,
     pub storage: Option<Box<dyn std::any::Any + Send + Sync>>,
 }
