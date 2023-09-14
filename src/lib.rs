@@ -20,7 +20,7 @@ use bevy::utils::HashMap;
 
 pub struct PicoPlugin {
     // Set if using in a scene with no 2d camera
-    pub create_default_cam_with_order: Option<isize>,
+    pub create_default_2d_cam_with_order: Option<isize>,
 }
 
 #[derive(Resource)]
@@ -30,7 +30,7 @@ impl Plugin for PicoPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Pico>()
             .add_systems(PreUpdate, render.after(InputSystem));
-        if let Some(n) = self.create_default_cam_with_order {
+        if let Some(n) = self.create_default_2d_cam_with_order {
             app.insert_resource(CreateDefaultCamWithOrder(n))
                 .add_systems(Startup, setup_default_cam);
         }
@@ -57,12 +57,12 @@ fn setup_default_cam(mut commands: Commands, order: Res<CreateDefaultCamWithOrde
 pub fn button(pico: &mut Pico, item: PicoItem) -> usize {
     let button_index = pico.items.len();
     let pico = pico.add(item);
-    let a = if pico.hovered(button_index) {
-        0.03
+    let c = pico.get_mut(button_index).background;
+    pico.get_mut(button_index).background = if pico.hovered(button_index) {
+        c + Color::rgba(0.04, 0.04, 0.04, 0.04)
     } else {
-        0.01
+        c
     };
-    pico.get_mut(button_index).background = Color::rgba(1.0, 1.0, 1.0, a);
     button_index
 }
 
@@ -514,7 +514,7 @@ fn render(
     }
 
     // Sort so we interact in z order.
-    items.sort_by(|a, b| a.position.z.partial_cmp(&b.position.z).unwrap());
+    items.sort_by(|a, b| b.position.z.partial_cmp(&a.position.z).unwrap());
 
     let mut first_interact_found = false;
 

@@ -15,10 +15,8 @@ use bevy::{
 };
 
 use bevy_basic_camera::{CameraController, CameraControllerPlugin};
-use bevy_coordinate_systems::{
-    impico::{button, drag_value, DragValue, ImTextCamera, Pico, PicoItem, PicoPlugin},
-    CoordinateTransformationsPlugin, View,
-};
+use bevy_coordinate_systems::{CoordinateTransformationsPlugin, View};
+use bevy_picoui::{button, drag_value, DragValue, Pico, Pico2dCamera, PicoItem, PicoPlugin};
 
 fn get_default_cam_trans() -> Transform {
     Transform::from_xyz(3.0, 2.5, 3.0).looking_at(Vec3::ZERO, Vec3::Y)
@@ -39,7 +37,7 @@ fn main() {
             CameraControllerPlugin,
             CoordinateTransformationsPlugin,
             PicoPlugin {
-                create_default_cam_with_order: Some(1),
+                create_default_2d_cam_with_order: Some(1),
             },
         ))
         .add_systems(Startup, setup)
@@ -91,7 +89,7 @@ fn setup(
             orbit_focus: Vec3::new(0.0, 0.5, 0.0),
             ..default()
         },
-        ImTextCamera,
+        Pico2dCamera,
         RenderLayers::all(),
     ));
 
@@ -229,46 +227,6 @@ fn update(
     {
         let _guard = pico.vstack(0.02, 0.01);
 
-        let b = pico
-            .add(PicoItem {
-                position: vec3(0.0, 0.0, 0.0),
-                rect: vec2(1.0, 0.1),
-                background: Color::RED,
-                rect_anchor: Anchor::TopLeft,
-                parent: Some(side_bar),
-                ..default()
-            })
-            .last();
-        {
-            let _guard = pico.hstack(0.0, 0.02);
-            for _ in 0..10 {
-                let c = pico
-                    .add(PicoItem {
-                        position: vec3(0.0, 0.0, 0.0),
-                        rect: vec2(0.08, 1.0),
-                        background: Color::BLUE,
-                        rect_anchor: Anchor::TopLeft,
-                        parent: Some(b),
-                        ..default()
-                    })
-                    .last();
-                {
-                    let _guard = pico.vstack(0.0, 0.04);
-                    for _ in 0..10 {
-                        pico.add(PicoItem {
-                            position: vec3(0.0, 0.0, 0.0),
-                            rect: vec2(1.0, 0.05),
-                            background: Color::GREEN,
-                            rect_anchor: Anchor::TopLeft,
-                            parent: Some(c),
-                            ..default()
-                        })
-                        .last();
-                    }
-                }
-            }
-        }
-
         pico.add(PicoItem {
             position: vec3(0.02, 0.0, 0.0),
             rect: vec2(1.0, 0.02),
@@ -311,6 +269,7 @@ fn update(
             PicoItem {
                 position: vec3(0.05, 0.0, 0.0),
                 rect: vec2(0.9, 0.04),
+                background: Color::DARK_GRAY,
                 text: "RESET CAMERA".to_string(),
                 parent: Some(side_bar),
                 ..default()
