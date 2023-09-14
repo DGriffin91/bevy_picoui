@@ -55,15 +55,42 @@ fn setup_default_cam(mut commands: Commands, order: Res<CreateDefaultCamWithOrde
 // -------------------------
 
 pub fn button(pico: &mut Pico, item: PicoItem) -> usize {
-    let button_index = pico.items.len();
+    let index = pico.items.len();
     let pico = pico.add(item);
-    let c = pico.get_mut(button_index).background;
-    pico.get_mut(button_index).background = if pico.hovered(button_index) {
-        c + Color::rgba(0.04, 0.04, 0.04, 0.04)
+    let c = pico.get(index).background;
+    pico.get_mut(index).background = if pico.hovered(index) {
+        c + Color::rgba(0.06, 0.06, 0.06, 0.06)
     } else {
         c
     };
-    button_index
+    index
+}
+
+// -------------------------
+// Toggle Button example widget
+// -------------------------
+
+pub fn toggle_button(
+    pico: &mut Pico,
+    item: PicoItem,
+    enabled_bg: Color,
+    toggle_state: &mut bool,
+) -> usize {
+    let index = pico.items.len();
+    let pico = pico.add(item);
+    let mut c = pico.get(index).background;
+    if pico.clicked(index) {
+        *toggle_state = !*toggle_state;
+    }
+    if *toggle_state {
+        c = enabled_bg;
+    }
+    pico.get_mut(index).background = if pico.hovered(index) {
+        c + Color::rgba(0.06, 0.06, 0.06, 0.06)
+    } else {
+        c
+    };
+    index
 }
 
 // -------------------------
@@ -458,7 +485,6 @@ pub struct StateItem {
     pub life: f32,
     pub hover: bool,
     pub interactable: bool,
-    pub toggle_state: bool,
     pub drag: Option<Drag>,
     pub id: u64,
     pub input: Option<Input<MouseButton>>,

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bevy::{asset::ChangeWatcher, math::*, prelude::*, render::view::RenderLayers, sprite::Anchor};
 
-use bevy_picoui::{button, Pico, Pico2dCamera, PicoItem, PicoPlugin};
+use bevy_picoui::{toggle_button, Pico, Pico2dCamera, PicoItem, PicoPlugin};
 
 fn main() {
     App::new()
@@ -66,6 +66,59 @@ fn setup(
     ));
 }
 
+fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
+    let _guard = pico.window_ratio_mode();
+
+    let main_box = pico
+        .add(PicoItem {
+            position: vec3(0.1, 0.5, 0.0),
+            rect_anchor: Anchor::CenterLeft,
+            rect: vec2(0.5, 0.5),
+            background: SLATE,
+            ..default()
+        })
+        .last();
+
+    {
+        let _guard = pico.vstack(0.01, 0.015);
+
+        for row in &mut toggle_states {
+            let lane = pico
+                .add(PicoItem {
+                    position: vec3(0.0, 0.0, 0.0),
+                    rect: vec2(1.0, 0.08),
+                    background: CURRENT,
+                    rect_anchor: Anchor::TopLeft,
+                    parent: Some(main_box),
+                    ..default()
+                })
+                .last();
+            {
+                let _guard = pico.hstack(0.0, 0.045);
+                for toggle_state in row {
+                    toggle_button(
+                        &mut pico,
+                        PicoItem {
+                            position: vec3(0.0, 0.1, 0.0),
+                            rect: vec2(0.05, 0.8),
+                            background: OILVINE,
+                            rect_anchor: Anchor::TopLeft,
+                            parent: Some(lane),
+                            ..default()
+                        },
+                        OILVINE + Color::DARK_GRAY,
+                        toggle_state,
+                    );
+                }
+            }
+        }
+    }
+}
+
+// ------
+// Colors
+// ------
+
 pub const SLATE: Color = Color::Rgba {
     red: 0.156,
     green: 0.239,
@@ -93,50 +146,3 @@ pub const OILVINE: Color = Color::Rgba {
     blue: 0.412,
     alpha: 1.0,
 };
-
-fn update(mut pico: ResMut<Pico>) {
-    let _guard = pico.window_ratio_mode();
-
-    let main_box = pico
-        .add(PicoItem {
-            position: vec3(0.1, 0.5, 0.0),
-            rect_anchor: Anchor::CenterLeft,
-            rect: vec2(0.5, 0.5),
-            background: SLATE,
-            ..default()
-        })
-        .last();
-
-    {
-        let _guard = pico.vstack(0.01, 0.015);
-
-        for _ in 0..10 {
-            let lane = pico
-                .add(PicoItem {
-                    position: vec3(0.0, 0.0, 0.0),
-                    rect: vec2(1.0, 0.08),
-                    background: CURRENT,
-                    rect_anchor: Anchor::TopLeft,
-                    parent: Some(main_box),
-                    ..default()
-                })
-                .last();
-            {
-                let _guard = pico.hstack(0.0, 0.045);
-                for _ in 0..10 {
-                    button(
-                        &mut pico,
-                        PicoItem {
-                            position: vec3(0.0, 0.1, 0.0),
-                            rect: vec2(0.05, 0.8),
-                            background: OILVINE,
-                            rect_anchor: Anchor::TopLeft,
-                            parent: Some(lane),
-                            ..default()
-                        },
-                    );
-                }
-            }
-        }
-    }
-}
