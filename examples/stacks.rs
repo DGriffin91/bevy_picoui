@@ -67,13 +67,12 @@ fn setup(
 }
 
 fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
-    let _guard = pico.window_ratio_mode();
-
+    let vh = pico.vh;
     let main_box = pico
         .add(PicoItem {
-            position: vec3(0.1, 0.5, 0.0),
+            position: vec3(0.1 * vh, 0.5, 0.0),
             rect_anchor: Anchor::CenterLeft,
-            rect: vec2(0.5, 0.5),
+            rect: vec2(0.5 * vh, 0.5),
             background: SLATE,
             ..default()
         })

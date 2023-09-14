@@ -391,10 +391,13 @@ pub struct Pico {
     pub stack_stack: Vec<Stack>,
     pub stack_guard: Guard,
     pub window_size: Vec2,
-    pub window_ratio_mode_enabled: Guard,
-    pub window_ratio: f32,
-    // The right edge of the window when using ratio mode
-    pub window_ratio_right: f32,
+    /// The ratio of window height to window width.
+    /// For keeping items horizontally proportional.
+    /// 2d x coords are mapped so that when x is 1 it is the same distance in pixels as when y is 1
+    /// (For keeping things from stretching horizontally when scaling the window)
+    pub vh: f32,
+    /// The right edge of the window after scaling by vh
+    pub vh_right: f32,
     pub mouse_button_input: Option<Input<MouseButton>>,
 }
 
@@ -416,13 +419,6 @@ impl Pico {
         });
         self.stack_guard.push();
         self.stack_guard.clone()
-    }
-    /// For keeping items horizontally proportional.
-    /// 2d x coords are mapped so that when x is 1 it is the same distance in pixels as when y is 1
-    /// Use with window_ratio_right to find the right edge of the window
-    pub fn window_ratio_mode(&mut self) -> Guard {
-        self.window_ratio_mode_enabled.push();
-        self.window_ratio_mode_enabled.clone()
     }
     pub fn get_hovered(&self, index: usize) -> Option<&StateItem> {
         if let Some(state_item) = self.get_state(index) {
@@ -492,16 +488,6 @@ impl Pico {
                 item.position = lerp(parent_2d_bbox.xy(), parent_2d_bbox.zw(), item.position.xy())
                     .extend(item.position.z);
                 item.rect *= (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
-            }
-        }
-        if self.window_ratio_mode_enabled.get() > 0 {
-            if !item.position_3d {
-                if item.parent.is_none() {
-                    item.position.x *= self.window_ratio;
-                }
-            }
-            if item.parent.is_none() {
-                item.rect.x *= self.window_ratio;
             }
         }
         if item.spatial_id.is_none() {
@@ -641,7 +627,7 @@ fn render(
         }
         let spatial_id = item.spatial_id.unwrap();
 
-        let text_ndc = if item.position_3d {
+        let item_ndc = if item.position_3d {
             camera
                 .world_to_ndc(camera_transform, item.position)
                 .unwrap_or(Vec3::NAN)
@@ -649,7 +635,7 @@ fn render(
             ((item.position.xy() - Vec2::splat(0.5)) * vec2(2.0, -2.0)).extend(item.position.z)
         };
 
-        let text_pos = text_ndc.xy() * window_size * 0.5;
+        let item_pos = item_ndc.xy() * window_size * 0.5;
 
         let generate = if let Some(existing_state_item) = pico.state.get_mut(&spatial_id) {
             // If a item in the state matches one created this frame keep it around
@@ -659,7 +645,7 @@ fn render(
             else {
                 continue;
             };
-            trans.translation = text_pos.extend(text_ndc.z);
+            trans.translation = item_pos.extend(item_ndc.z);
 
             if !existing_state_item.interactable {
                 continue;
@@ -745,7 +731,7 @@ fn render(
                     anchor: item.rect_anchor.clone(),
                     ..default()
                 };
-                let trans = Transform::from_translation(text_pos.extend(1.0));
+                let trans = Transform::from_translation(item_pos.extend(1.0));
                 let entity = commands
                     .spawn((
                         SpriteBundle {
@@ -780,7 +766,7 @@ fn render(
                     .spawn(Text2dBundle {
                         text,
                         text_anchor: item.anchor.clone(),
-                        transform: Transform::from_translation(text_pos.extend(1.0)),
+                        transform: Transform::from_translation(item_pos.extend(1.0)),
                         ..default()
                     })
                     .id();
@@ -808,8 +794,8 @@ fn render(
     pico.state.retain(|_, state_item| state_item.life >= 0.0);
     pico.interacting = interacting;
     pico.window_size = window_size;
-    pico.window_ratio = window_size.y / window_size.x;
-    pico.window_ratio_right = window_size.x / window_size.y;
+    pico.vh = window_size.y / window_size.x;
+    pico.vh_right = window_size.x / window_size.y;
     pico.mouse_button_input = Some(mouse_button_input.clone());
 }
 

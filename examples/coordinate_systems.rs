@@ -175,14 +175,13 @@ fn update(
     mut camera_controller: Query<&mut CameraController>,
     mut char_input_events: EventReader<ReceivedCharacter>,
 ) {
-    let _window_ratio_guard = pico.window_ratio_mode();
     if let Some(mut camera_controller) = camera_controller.iter_mut().next() {
         // Disable camera controller if pico is interacting
         camera_controller.enabled = !pico.interacting;
     }
 
     // Example instructions
-    let right = pico.window_ratio_right;
+    let right = pico.vh_right;
     pico.add(PicoItem {
         position: vec3(right, 1.0, 0.0),
         text: String::from(
@@ -198,12 +197,13 @@ fn update(
     let Ok((view, mut trans)) = camera.get_single_mut() else {
         return;
     };
+    let vh = pico.vh;
 
     let side_bar = pico
         .add(PicoItem {
             position: vec3(0.0, 0.0, 0.0),
             rect_anchor: Anchor::TopLeft,
-            rect: vec2(0.2, 1.0),
+            rect: vec2(0.2 * vh, 1.0),
             alignment: TextAlignment::Left,
             background: Color::rgba(0.2, 0.2, 0.2, 0.2),
             ..default()
@@ -295,7 +295,7 @@ fn update(
         PicoItem {
             position: p,
             position_3d: true,
-            rect: vec2(0.02, 0.02),
+            rect: vec2(0.02 * vh, 0.02),
             background: Color::rgba(0.0, 0.0, 0.0, 0.3),
             text: s.to_string(),
             font_size: 0.02,
