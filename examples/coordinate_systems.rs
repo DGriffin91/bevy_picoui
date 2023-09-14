@@ -173,6 +173,7 @@ fn update(
     mut camera: Query<(&View, &mut Transform), With<ExampleCamera>>,
     mut pico: ResMut<Pico>,
     mut camera_controller: Query<&mut CameraController>,
+    mut char_input_events: EventReader<ReceivedCharacter>,
 ) {
     let _window_ratio_guard = pico.window_ratio_mode();
     if let Some(mut camera_controller) = camera_controller.iter_mut().next() {
@@ -209,20 +210,33 @@ fn update(
         })
         .last();
 
-    let tdrag = |pico: &mut Pico, label: &str, value: f32| -> DragValue {
-        let dv = drag_value(
-            pico,
-            vec3(0.05, 0.0, 0.0),
-            0.04,
-            0.6,
-            0.3,
-            label,
-            0.01,
-            value,
-            Some(side_bar),
-        );
-        dv
-    };
+    let mut tdrag =
+        |pico: &mut Pico, bg: Color, label: &str, value: f32, relative: bool| -> DragValue {
+            let scale = 0.01;
+            let dv = drag_value(
+                pico,
+                bg,
+                vec3(0.05, 0.0, 0.0),
+                0.04,
+                0.6,
+                0.3,
+                label,
+                scale,
+                value,
+                Some(side_bar),
+                Some(&mut char_input_events),
+            );
+            if relative {
+                // Show relative value while dragging drag
+                if let Some(state) = pico.get_state_mut(dv.drag_index) {
+                    if let Some(drag) = state.drag {
+                        pico.get_mut(dv.drag_index).text =
+                            format!("{:.2}", drag.total_delta().x * scale)
+                    }
+                }
+            }
+            dv
+        };
 
     {
         let _guard = pico.vstack(0.02, 0.01);
@@ -237,31 +251,25 @@ fn update(
         })
         .last();
 
-        let dv = tdrag(&mut pico, "Local X", 0.0);
-        pico.get_mut(dv.drag_index).background += Color::rgba(0.0, -0.5, -0.5, 0.05); // Need * for color
+        let dv = tdrag(&mut pico, RED, "Local X", 0.0, true);
         let v = trans.right();
         trans.translation += v * dv.value;
 
-        let dv = tdrag(&mut pico, "Local Y", 0.0);
-        pico.get_mut(dv.drag_index).background += Color::rgba(-0.5, 0.0, -0.5, 0.05); // Need * for color
+        let dv = tdrag(&mut pico, GREEN, "Local Y", 0.0, true);
         let v = trans.forward();
         trans.translation += v * dv.value;
 
-        let dv = tdrag(&mut pico, "Local Z", 0.0);
-        pico.get_mut(dv.drag_index).background += Color::rgba(-0.5, -0.5, 0.0, 0.05); // Need * for color
+        let dv = tdrag(&mut pico, BLUE, "Local Z", 0.0, true);
         let v = trans.up();
         trans.translation += v * dv.value;
 
-        let dv = tdrag(&mut pico, "World X", trans.translation.x);
-        pico.get_mut(dv.drag_index).background += Color::rgba(0.0, -0.5, -0.5, 0.05); // Need * for color
+        let dv = tdrag(&mut pico, RED, "World X", trans.translation.x, false);
         trans.translation.x = dv.value;
 
-        let dv = tdrag(&mut pico, "World Y", trans.translation.y);
-        pico.get_mut(dv.drag_index).background += Color::rgba(-0.5, 0.0, -0.5, 0.05); // Need * for color
+        let dv = tdrag(&mut pico, GREEN, "World Y", trans.translation.y, false);
         trans.translation.y = dv.value;
 
-        let dv = tdrag(&mut pico, "World Z", trans.translation.z);
-        pico.get_mut(dv.drag_index).background += Color::rgba(-0.5, -0.5, 0.0, 0.05); // Need * for color
+        let dv = tdrag(&mut pico, BLUE, "World Z", trans.translation.z, false);
         trans.translation.z = dv.value;
 
         let btn = button(
@@ -269,7 +277,7 @@ fn update(
             PicoItem {
                 position: vec3(0.05, 0.0, 0.0),
                 rect: vec2(0.9, 0.04),
-                background: Color::DARK_GRAY,
+                background: DARK_GRAY,
                 text: "RESET CAMERA".to_string(),
                 parent: Some(side_bar),
                 ..default()
@@ -337,3 +345,32 @@ fn update(
         pico.add(axis_text(view_zero + view_z_dir, "+Z"));
     }
 }
+
+// ------
+// Colors
+// ------
+
+pub const RED: Color = Color::Rgba {
+    red: 0.3,
+    green: 0.15,
+    blue: 0.15,
+    alpha: 1.0,
+};
+pub const GREEN: Color = Color::Rgba {
+    red: 0.15,
+    green: 0.3,
+    blue: 0.15,
+    alpha: 1.0,
+};
+pub const BLUE: Color = Color::Rgba {
+    red: 0.15,
+    green: 0.15,
+    blue: 0.3,
+    alpha: 1.0,
+};
+pub const DARK_GRAY: Color = Color::Rgba {
+    red: 0.2,
+    green: 0.2,
+    blue: 0.2,
+    alpha: 0.5,
+};

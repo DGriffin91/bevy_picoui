@@ -105,6 +105,7 @@ pub struct DragValue {
 
 pub fn drag_value(
     pico: &mut Pico,
+    drag_bg: Color,
     position: Vec3,
     height: f32,
     label_width: f32,
@@ -113,8 +114,10 @@ pub fn drag_value(
     scale: f32,
     value: f32,
     parent: Option<usize>,
+    char_input_events: Option<&mut EventReader<ReceivedCharacter>>,
 ) -> DragValue {
     let mut value = value;
+    let mut drag_bg = drag_bg;
     let vstack_end = pico
         .stack_stack
         .last_mut()
@@ -131,7 +134,8 @@ pub fn drag_value(
         ..default()
     });
 
-    let mut b = PicoItem {
+    let mut drag_item = PicoItem {
+        // TODO user or auto precision
         text: format!("{:.2}", value),
         position: position + Vec3::X * label_width,
         rect: vec2(drag_width, height),
@@ -139,7 +143,7 @@ pub fn drag_value(
         ..default()
     };
 
-    b.rect_anchor = Anchor::TopLeft;
+    drag_item.rect_anchor = Anchor::TopLeft;
     let drag_index = pico.items.len();
     // If were in a vstack, roll it back so we are on the same row
     if let Some(stack) = pico.stack_stack.last_mut() {
@@ -147,21 +151,94 @@ pub fn drag_value(
             stack.end = vstack_end;
         }
     }
-    let pico = pico.add(b);
+    let pico = pico.add(drag_item);
     let mut dragging = false;
     if let Some(state) = pico.get_state(drag_index) {
         if let Some(drag) = state.drag {
-            pico.items.last_mut().unwrap().text = format!("{:.2}", drag.total_delta().x * scale);
             value = drag.delta().x * scale + value;
             dragging = true;
         }
     };
-    let a = if pico.hovered(drag_index) || dragging {
-        0.035
+    if let Some(char_input_events) = char_input_events {
+        let mouse_just_pressed = if let Some(mouse_button_input) = &pico.mouse_button_input {
+            mouse_button_input.any_just_pressed([
+                MouseButton::Left,
+                MouseButton::Right,
+                MouseButton::Middle,
+            ])
+        } else {
+            false
+        };
+        let mut current_string = None;
+        let released = pico.released(drag_index);
+        let mut reset = false;
+        let mut apply = false;
+        let mut selected = false;
+        if let Some(state) = pico.get_state_mut(drag_index) {
+            let mut just_selected = false;
+            if state.storage.is_none() {
+                state.storage = Some(Box::new(String::new()));
+            }
+            if !dragging && released {
+                state.selected = true;
+                just_selected = true;
+            }
+            if state.selected {
+                selected = true;
+                let backspace = char::from_u32(0x08).unwrap();
+                let esc = char::from_u32(0x1b).unwrap();
+                let enter = '\r';
+                if let Some(storage) = &mut state.storage {
+                    let s = storage.downcast_mut::<String>().unwrap();
+                    if mouse_just_pressed && !just_selected {
+                        apply = true;
+                    } else {
+                        // TODO: usually when a text field like this is first selected it would have all of the
+                        // text in the field selected, so typing anything would overwrite the existing value
+                        // or the cursor could be moved to preserve the value.
+                        //if just_selected {
+                        //    // TODO user or auto precision
+                        //    *s = format!("{:.2}", value);
+                        //}
+                        for e in char_input_events.iter() {
+                            if e.char == esc {
+                                reset = true;
+                            } else if e.char == backspace {
+                                s.pop();
+                            } else if e.char == enter {
+                                apply = true;
+                                break;
+                            } else if e.char.is_digit(10) || e.char == '.' || e.char == '-' {
+                                s.push(e.char);
+                            }
+                        }
+                        current_string = Some(s.clone());
+                    }
+                    if apply {
+                        if let Ok(parse_val) = s.parse::<f32>() {
+                            value = parse_val;
+                        }
+                        reset = true;
+                    }
+                    if reset {
+                        state.selected = false;
+                        *s = String::new();
+                    }
+                }
+            }
+        }
+        if let Some(current_string) = current_string {
+            pico.get_mut(drag_index).text = current_string;
+        }
+        if selected {
+            drag_bg += Color::rgba(0.2, 0.2, 0.2, 0.2);
+        }
+    }
+    pico.get_mut(drag_index).background = if pico.hovered(drag_index) {
+        drag_bg + Color::rgba(0.06, 0.06, 0.06, 0.06)
     } else {
-        0.01
+        drag_bg
     };
-    pico.get_mut(drag_index).background = Color::rgba(1.0, 1.0, 1.0, a);
     DragValue {
         value,
         text_index,
@@ -318,6 +395,7 @@ pub struct Pico {
     pub window_ratio: f32,
     // The right edge of the window when using ratio mode
     pub window_ratio_right: f32,
+    pub mouse_button_input: Option<Input<MouseButton>>,
 }
 
 impl Pico {
@@ -461,6 +539,14 @@ impl Pico {
     pub fn last(&self) -> usize {
         (self.items.len() - 1).max(0)
     }
+    pub fn storage(&mut self) -> Option<&mut Option<Box<dyn std::any::Any + Send + Sync>>> {
+        if let Some(item) = self.items.last() {
+            if let Some(state_item) = self.state.get_mut(&item.spatial_id.unwrap()) {
+                return Some(&mut state_item.storage);
+            }
+        }
+        None
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -485,10 +571,12 @@ pub struct StateItem {
     pub life: f32,
     pub hover: bool,
     pub interactable: bool,
+    pub selected: bool,
     pub drag: Option<Drag>,
     pub id: u64,
     pub input: Option<Input<MouseButton>>,
     pub bbox: Vec4,
+    pub storage: Option<Box<dyn std::any::Any + Send + Sync>>,
 }
 
 #[derive(Component)]
@@ -722,6 +810,7 @@ fn render(
     pico.window_size = window_size;
     pico.window_ratio = window_size.y / window_size.x;
     pico.window_ratio_right = window_size.x / window_size.y;
+    pico.mouse_button_input = Some(mouse_button_input.clone());
 }
 
 fn get_bbox(rect: Vec2, uv_position: Vec2, anchor: &Anchor) -> Vec4 {
