@@ -228,7 +228,7 @@ pub fn drag_value(
             }
         }
         if let Some(current_string) = current_string {
-            pico.get_mut(drag_index).text = current_string;
+            pico.get_mut(drag_index).text = current_string + "|";
         }
         if selected {
             drag_bg += Color::rgba(0.2, 0.2, 0.2, 0.2);
