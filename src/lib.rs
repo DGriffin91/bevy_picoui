@@ -59,7 +59,7 @@ pub fn button(pico: &mut Pico, item: PicoItem) -> usize {
     let pico = pico.add(item);
     let c = pico.get(index).background;
     pico.get_mut(index).background = if pico.hovered(index) {
-        c + Color::rgba(0.06, 0.06, 0.06, 0.06)
+        c + Vec4::splat(0.06)
     } else {
         c
     };
@@ -86,7 +86,7 @@ pub fn toggle_button(
         c = enabled_bg;
     }
     pico.get_mut(index).background = if pico.hovered(index) {
-        c + Color::rgba(0.06, 0.06, 0.06, 0.06)
+        c + Vec4::splat(0.06)
     } else {
         c
     };
@@ -231,11 +231,11 @@ pub fn drag_value(
             pico.get_mut(drag_index).text = current_string + "|";
         }
         if selected {
-            drag_bg += Color::rgba(0.2, 0.2, 0.2, 0.2);
+            drag_bg += Vec4::splat(0.25);
         }
     }
     pico.get_mut(drag_index).background = if pico.hovered(drag_index) {
-        drag_bg + Color::rgba(0.06, 0.06, 0.06, 0.06)
+        drag_bg + Vec4::splat(0.06)
     } else {
         drag_bg
     };

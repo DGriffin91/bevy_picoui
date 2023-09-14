@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use bevy::{asset::ChangeWatcher, math::*, prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::{math::*, prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use bevy_basic_camera::{CameraController, CameraControllerPlugin};
 use bevy_coordinate_systems::CoordinateTransformationsPlugin;
