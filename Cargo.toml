@@ -1,5 +1,5 @@
 [package]
-name = "bevy_coordinate_systems"
+name = "bevy_picoui"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,6 +8,7 @@ bevy = "0.11"
 
 [dev-dependencies]
 bevy_basic_camera = { git = "https://github.com/DGriffin91/bevy_basic_camera" }
+bevy_coordinate_systems = { git = "https://github.com/DGriffin91/bevy_coordinate_systems" }
 
 [profile.dev]
 opt-level = 3

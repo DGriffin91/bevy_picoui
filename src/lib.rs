@@ -1,294 +1,706 @@
 use bevy::{
-    asset::load_internal_asset,
-    math::{uvec4, vec2, Vec4Swizzles},
+    core_pipeline::clear_color::ClearColorConfig,
+    input::InputSystem,
+    math::{vec2, vec4, Vec3Swizzles, Vec4Swizzles},
     prelude::*,
-    reflect::TypeUuid,
-    render::camera::{CameraProjection, TemporalJitter},
-    transform::systems::propagate_transforms,
+    sprite::Anchor,
+    text::{BreakLineOn, Text2dBounds},
+};
+use core::hash::Hash;
+use core::hash::Hasher;
+use std::{
+    collections::hash_map::DefaultHasher,
+    sync::{
+        atomic::{AtomicI32, Ordering},
+        Arc,
+    },
 };
 
-pub mod impico;
+use bevy::utils::HashMap;
 
-pub const VIEW_TRANSFORMATIONS: HandleUntyped =
-    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 4396331565425081187);
+pub struct PicoPlugin {
+    // Set if using in a scene with no 2d camera
+    pub create_default_cam_with_order: Option<isize>,
+}
 
-pub struct CoordinateTransformationsPlugin;
+#[derive(Resource)]
+pub struct CreateDefaultCamWithOrder(isize);
 
-impl Plugin for CoordinateTransformationsPlugin {
+impl Plugin for PicoPlugin {
     fn build(&self, app: &mut App) {
-        load_internal_asset!(
-            app,
-            VIEW_TRANSFORMATIONS,
-            "view_transformations.wgsl",
-            Shader::from_wgsl
-        );
-        // NOTE: The view will reflect the last frame unless the system you run is after prepare_view
-        // TODO Maybe update this incrementally as change detection for the camera is triggered?
-        //      (Would require manually computing the GlobalTransform)
-        app.add_systems(PostUpdate, prepare_view.after(propagate_transforms));
+        app.init_resource::<Pico>()
+            .add_systems(PreUpdate, render.after(InputSystem));
+        if let Some(n) = self.create_default_cam_with_order {
+            app.insert_resource(CreateDefaultCamWithOrder(n))
+                .add_systems(Startup, setup_default_cam);
+        }
     }
 }
 
-// https://github.com/bevyengine/bevy/blob/a9e50dd80178bc50b644f557511111ba2c265a56/crates/bevy_render/src/camera/camera.rs#L637
-// https://github.com/bevyengine/bevy/blob/a9e50dd80178bc50b644f557511111ba2c265a56/crates/bevy_render/src/view/mod.rs#L347
-pub fn prepare_view(
-    mut commands: Commands,
-    views: Query<(
-        Entity,
-        &Camera,
-        &GlobalTransform,
-        &Projection,
-        Option<&TemporalJitter>,
-    )>,
-) {
-    for (entity, camera, transform, projection, temporal_jitter) in &views {
-        let projection_type = match projection {
-            Projection::Perspective(_) => ProjectionType::Perspective,
-            Projection::Orthographic(_) => ProjectionType::Orthographic,
-        };
-        let viewport = camera.viewport.clone().unwrap_or_default();
-        let viewport = uvec4(
-            viewport.physical_position.x,
-            viewport.physical_position.y,
-            viewport.physical_size.x,
-            viewport.physical_size.y,
-        )
-        .as_vec4();
-        let unjittered_projection = projection.get_projection_matrix();
-        let mut projection = unjittered_projection;
+fn setup_default_cam(mut commands: Commands, order: Res<CreateDefaultCamWithOrder>) {
+    commands.spawn(Camera2dBundle {
+        camera: Camera {
+            order: order.0,
+            ..default()
+        },
+        camera_2d: Camera2d {
+            clear_color: ClearColorConfig::None,
+        },
+        ..default()
+    });
+}
 
-        if let Some(temporal_jitter) = temporal_jitter {
-            temporal_jitter.jitter_projection(&mut projection, viewport.zw());
+// -------------------------
+// Button example widget
+// -------------------------
+
+pub fn button(pico: &mut Pico, item: PicoItem) -> usize {
+    let button_index = pico.items.len();
+    let pico = pico.add(item);
+    let a = if pico.hovered(button_index) {
+        0.03
+    } else {
+        0.01
+    };
+    pico.get_mut(button_index).background = Color::rgba(1.0, 1.0, 1.0, a);
+    button_index
+}
+
+// -------------------------
+// Value drag example widget
+// -------------------------
+
+pub struct DragValue {
+    pub value: f32,
+    pub text_index: usize,
+    pub drag_index: usize,
+}
+
+pub fn drag_value(
+    pico: &mut Pico,
+    position: Vec3,
+    height: f32,
+    label_width: f32,
+    drag_width: f32,
+    label: &str,
+    scale: f32,
+    value: f32,
+    parent: Option<usize>,
+) -> DragValue {
+    let mut value = value;
+    let vstack_end = pico
+        .stack_stack
+        .last_mut()
+        .and_then(|stack| Some(stack.end))
+        .unwrap_or(0.0);
+    let text_index = pico.items.len();
+    let pico = pico.add(PicoItem {
+        text: label.to_string(),
+        position,
+        rect: vec2(label_width, height),
+        anchor: Anchor::CenterLeft,
+        rect_anchor: Anchor::TopLeft,
+        parent,
+        ..default()
+    });
+
+    let mut b = PicoItem {
+        text: format!("{:.2}", value),
+        position: position + Vec3::X * label_width,
+        rect: vec2(drag_width, height),
+        parent,
+        ..default()
+    };
+
+    b.rect_anchor = Anchor::TopLeft;
+    let drag_index = pico.items.len();
+    // If were in a vstack, roll it back so we are on the same row
+    if let Some(stack) = pico.stack_stack.last_mut() {
+        if stack.vertical {
+            stack.end = vstack_end;
         }
+    }
+    let pico = pico.add(b);
+    let mut dragging = false;
+    if let Some(state) = pico.get_state(drag_index) {
+        if let Some(drag) = state.drag {
+            pico.items.last_mut().unwrap().text = format!("{:.2}", drag.total_delta().x * scale);
+            value = drag.delta().x * scale + value;
+            dragging = true;
+        }
+    };
+    let a = if pico.hovered(drag_index) || dragging {
+        0.035
+    } else {
+        0.01
+    };
+    pico.get_mut(drag_index).background = Color::rgba(1.0, 1.0, 1.0, a);
+    DragValue {
+        value,
+        text_index,
+        drag_index,
+    }
+}
 
-        let inverse_projection = projection.inverse();
-        let view = transform.compute_matrix();
-        let inverse_view = view.inverse();
+// Only supports one camera.
+#[derive(Component)]
+pub struct Pico2dCamera;
 
-        let view_proj = projection * inverse_view;
+#[derive(Component, Clone, Debug)]
+pub struct PicoItem {
+    pub text: String,
+    /// If position_3d is false position is the screen uv coords with 0.0, 0.0 at top left
+    /// If position_3d is true position is the world space translation
+    /// Don't change after pico.add()
+    pub position: Vec3,
+    pub position_3d: bool,
+    /// 2d pixel coords. Text will center in rect if it is not Vec2::INFINITY.
+    /// Don't change after pico.add()
+    pub rect: Vec2,
+    pub font_size: f32,
+    pub color: Color,
+    pub background: Color,
+    pub alignment: TextAlignment,
+    pub anchor: Anchor,
+    pub rect_anchor: Anchor,
+    /// A button must also have a non Vec2::INFINITY rect.
+    pub button: bool,
+    /// If life is 0.0, it will only live one frame (default), if life is f32::INFINITY it will live forever.
+    pub life: f32,
+    /// If the id changes, the item is re-rendered
+    pub id: Option<u64>,
+    /// If the spatial_id changes a new state is used
+    /// Impacted by position, rect, rect_anchor (after transform from parent is applied, if any)
+    pub spatial_id: Option<u64>,
+    /// If set, coordinates for position/rect will be relative to parent.
+    pub parent: Option<usize>,
+}
 
-        commands.entity(entity).insert(View {
-            view_proj,
-            unjittered_view_proj: unjittered_projection * inverse_view,
-            inverse_view_proj: view * inverse_projection,
-            view,
-            inverse_view,
-            projection,
-            inverse_projection,
-            world_position: transform.translation(),
-            viewport,
-            projection_type,
+impl Default for PicoItem {
+    fn default() -> Self {
+        PicoItem {
+            position: Vec3::ZERO,
+            position_3d: false,
+            rect: Vec2::INFINITY,
+            text: String::new(),
+            font_size: 0.02,
+            color: Color::WHITE,
+            background: Color::NONE,
+            alignment: TextAlignment::Center,
+            anchor: Anchor::Center,
+            rect_anchor: Anchor::Center,
+            button: false,
+            life: 0.0,
+            id: None,
+            spatial_id: None,
+            parent: None,
+        }
+    }
+}
+
+impl PicoItem {
+    pub fn new2d(position: Vec3, text: &str) -> PicoItem {
+        PicoItem {
+            position,
+            text: text.to_string(),
+            ..default()
+        }
+    }
+    pub fn new3d(position: Vec3, text: &str) -> PicoItem {
+        PicoItem {
+            position,
+            text: text.to_string(),
+            position_3d: true,
+            ..default()
+        }
+    }
+    pub fn keep(mut self) -> Self {
+        self.life = f32::INFINITY;
+        self
+    }
+    fn generate_spatial_id(&self) -> u64 {
+        let hasher = &mut DefaultHasher::new();
+        self.position.x.to_bits().hash(hasher);
+        self.position.y.to_bits().hash(hasher);
+        self.position.z.to_bits().hash(hasher);
+        self.rect.x.to_bits().hash(hasher);
+        self.rect.y.to_bits().hash(hasher);
+        format!("{:?}", self.rect_anchor).hash(hasher);
+        hasher.finish()
+    }
+    fn generate_id(&mut self) -> u64 {
+        self.id = None;
+        let hasher = &mut DefaultHasher::new();
+        format!("{:?}", self).hash(hasher);
+        hasher.finish()
+    }
+}
+
+impl std::hash::Hash for PicoItem {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.spatial_id.unwrap().hash(state)
+    }
+}
+
+impl PartialEq for PicoItem {
+    fn eq(&self, other: &PicoItem) -> bool {
+        self.spatial_id.unwrap() == other.spatial_id.unwrap()
+    }
+}
+
+fn lerp(start: Vec2, end: Vec2, t: Vec2) -> Vec2 {
+    (1.0 - t) * start + t * end
+}
+
+#[derive(Default, Clone)]
+pub struct Guard(Arc<AtomicI32>);
+
+impl Guard {
+    pub fn push(&self) {
+        self.0.fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn pop(&self) {
+        self.0.fetch_sub(1, Ordering::Relaxed);
+        self.0.fetch_max(0, Ordering::Relaxed);
+    }
+    pub fn get(&self) -> i32 {
+        self.0.load(Ordering::Relaxed)
+    }
+}
+impl Drop for Guard {
+    fn drop(&mut self) {
+        self.pop()
+    }
+}
+
+pub struct Stack {
+    pub end: f32,
+    pub margin: f32,
+    pub vertical: bool,
+}
+
+#[derive(Resource, Default)]
+pub struct Pico {
+    pub state: HashMap<u64, StateItem>,
+    pub items: Vec<PicoItem>,
+    pub interacting: bool,
+    pub stack_stack: Vec<Stack>,
+    pub stack_guard: Guard,
+    pub window_size: Vec2,
+    pub window_ratio_mode_enabled: Guard,
+    pub window_ratio: f32,
+    // The right edge of the window when using ratio mode
+    pub window_ratio_right: f32,
+}
+
+impl Pico {
+    pub fn vstack(&mut self, start: f32, margin: f32) -> Guard {
+        self.stack_stack.push(Stack {
+            end: start,
+            margin,
+            vertical: true,
         });
+        self.stack_guard.push();
+        self.stack_guard.clone()
     }
-}
-
-#[derive(Clone)]
-pub enum ProjectionType {
-    Orthographic,
-    Perspective,
-}
-
-#[derive(Clone, Component)]
-pub struct View {
-    pub view_proj: Mat4,
-    pub unjittered_view_proj: Mat4,
-    pub inverse_view_proj: Mat4,
-    pub view: Mat4,
-    pub inverse_view: Mat4,
-    pub projection: Mat4,
-    pub inverse_projection: Mat4,
-    pub world_position: Vec3,
-    // viewport(x_origin, y_origin, width, height)
-    pub viewport: Vec4,
-    pub projection_type: ProjectionType,
-}
-
-impl View {
-    /// World space:
-    /// +y is up
-
-    /// View space:
-    /// -z is forward, +x is right, +y is up
-    /// Forward is from the camera position into the scene.
-    /// (0.0, 0.0, -1.0) is linear distance of 1.0 in front of the camera's view relative to the camera's rotation
-    /// (0.0, 1.0, 0.0) is linear distance of 1.0 above the camera's view relative to the camera's rotation
-
-    /// NDC (normalized device coordinate):
-    /// https://www.w3.org/TR/webgpu/#coordinate-systems
-    /// (-1.0, -1.0) in NDC is located at the bottom-left corner of NDC
-    /// (1.0, 1.0) in NDC is located at the top-right corner of NDC
-    /// Z is depth where 1.0 is near clipping plane, and 0.0 is inf far away
-
-    /// UV space:
-    /// 0.0, 0.0 is the top left
-    /// 1.0, 1.0 is the bottom right
-
-    // -----------------
-    // TO WORLD --------
-    // -----------------
-
-    /// Convert a view space position to world space
-    pub fn position_view_to_world(&self, view_pos: Vec3) -> Vec3 {
-        let world_pos = self.view * view_pos.extend(1.0);
-        world_pos.xyz()
+    pub fn hstack(&mut self, start: f32, margin: f32) -> Guard {
+        self.stack_stack.push(Stack {
+            end: start,
+            margin,
+            vertical: false,
+        });
+        self.stack_guard.push();
+        self.stack_guard.clone()
     }
-
-    /// Convert a clip space position to world space
-    pub fn position_clip_to_world(&self, clip_pos: Vec4) -> Vec3 {
-        let world_pos = self.inverse_view_proj * clip_pos;
-        world_pos.xyz()
+    /// For keeping items horizontally proportional.
+    /// 2d x coords are mapped so that when x is 1 it is the same distance in pixels as when y is 1
+    /// Use with window_ratio_right to find the right edge of the window
+    pub fn window_ratio_mode(&mut self) -> Guard {
+        self.window_ratio_mode_enabled.push();
+        self.window_ratio_mode_enabled.clone()
     }
-
-    /// Convert a ndc space position to world space
-    pub fn position_ndc_to_world(&self, ndc_pos: Vec3) -> Vec3 {
-        let world_pos = self.inverse_view_proj * ndc_pos.extend(1.0);
-        world_pos.xyz() / world_pos.w
-    }
-
-    /// Convert a view space direction to world space
-    pub fn direction_view_to_world(&self, view_dir: Vec3) -> Vec3 {
-        let world_dir = self.view * view_dir.extend(0.0);
-        world_dir.xyz()
-    }
-
-    /// Convert a clip space direction to world space
-    pub fn direction_clip_to_world(&self, clip_dir: Vec4) -> Vec3 {
-        let world_dir = self.inverse_view_proj * clip_dir;
-        world_dir.xyz()
-    }
-
-    // -----------------
-    // TO VIEW ---------
-    // -----------------
-
-    /// Convert a world space position to view space
-    pub fn position_world_to_view(&self, world_pos: Vec3) -> Vec3 {
-        let view_pos = self.inverse_view * world_pos.extend(1.0);
-        view_pos.xyz()
-    }
-
-    /// Convert a clip space position to view space
-    pub fn position_clip_to_view(&self, clip_pos: Vec4) -> Vec3 {
-        let view_pos = self.inverse_projection * clip_pos;
-        view_pos.xyz() / view_pos.w
-    }
-
-    /// Convert a ndc space position to view space
-    pub fn position_ndc_to_view(&self, ndc_pos: Vec3) -> Vec3 {
-        let view_pos = self.inverse_projection * ndc_pos.extend(1.0);
-        view_pos.xyz() / view_pos.w
-    }
-
-    /// Convert a world space direction to view space
-    pub fn direction_world_to_view(&self, world_dir: Vec3) -> Vec3 {
-        let view_dir = self.inverse_view * world_dir.extend(0.0);
-        view_dir.xyz()
-    }
-
-    /// Convert a clip space direction to view space
-    pub fn direction_clip_to_view(&self, clip_dir: Vec4) -> Vec3 {
-        let view_dir = self.inverse_projection * clip_dir;
-        view_dir.xyz()
-    }
-
-    // -----------------
-    // TO CLIP ---------
-    // -----------------
-
-    /// Convert a world space position to clip space
-    pub fn position_world_to_clip(&self, world_pos: Vec3) -> Vec4 {
-        self.view_proj * world_pos.extend(1.0)
-    }
-
-    /// Convert a view space position to clip space
-    pub fn position_view_to_clip(&self, view_pos: Vec3) -> Vec4 {
-        self.projection * view_pos.extend(1.0)
-    }
-
-    /// Convert a world space direction to clip space
-    pub fn direction_world_to_clip(&self, world_dir: Vec3) -> Vec4 {
-        self.view_proj * world_dir.extend(0.0)
-    }
-
-    /// Convert a view space direction to clip space
-    pub fn direction_view_to_clip(&self, view_dir: Vec3) -> Vec4 {
-        self.projection * view_dir.extend(0.0)
-    }
-
-    // -----------------
-    // TO NDC ----------
-    // -----------------
-
-    /// Convert a world space position to ndc space
-    pub fn position_world_to_ndc(&self, world_pos: Vec3) -> Vec3 {
-        let ndc_pos = self.view_proj * world_pos.extend(1.0);
-        ndc_pos.xyz() / ndc_pos.w
-    }
-
-    /// Convert a view space position to ndc space
-    pub fn position_view_to_ndc(&self, view_pos: Vec3) -> Vec3 {
-        let ndc_pos = self.projection * view_pos.extend(1.0);
-        ndc_pos.xyz() / ndc_pos.w
-    }
-
-    // -----------------
-    // DEPTH -----------
-    // -----------------
-
-    /// Retrieve the perspective camera near clipping plane
-    pub fn perspective_camera_near(&self) -> f32 {
-        self.projection.w_axis[2]
-    }
-
-    /// Convert ndc depth to linear view z.
-    /// Note: Depth values in front of the camera will be negative as -z is forward
-    pub fn depth_ndc_to_view_z(&self, ndc_depth: f32) -> f32 {
-        match self.projection_type {
-            ProjectionType::Orthographic => {
-                -(self.projection.w_axis[2] - ndc_depth) / self.projection.z_axis[2]
+    pub fn get_hovered(&self, index: usize) -> Option<&StateItem> {
+        if let Some(state_item) = self.get_state(index) {
+            if state_item.hover {
+                return Some(state_item);
             }
-            ProjectionType::Perspective => -self.perspective_camera_near() / ndc_depth,
         }
-
-        //let view_pos = self.inverse_projection * vec4(0.0, 0.0, ndc_depth, 1.0);
-        //return view_pos.z / view_pos.w;
+        None
     }
-
-    /// Convert linear view z to ndc depth.
-    /// Note: View z input should be negative for values in front of the camera as -z is forward
-    pub fn view_z_to_depth_ndc(&self, view_z: f32) -> f32 {
-        match self.projection_type {
-            ProjectionType::Orthographic => {
-                self.projection.w_axis[2] + view_z * self.projection.z_axis[2]
+    pub fn clicked(&self, index: usize) -> bool {
+        if let Some(state_item) = self.get_hovered(index) {
+            if let Some(input) = &state_item.input {
+                return input.just_pressed(MouseButton::Left);
             }
-            ProjectionType::Perspective => -self.perspective_camera_near() / view_z,
         }
-        //let ndc_pos = self.projection * vec4(0.0, 0.0, view_z, 1.0);
-        //return ndc_pos.z / ndc_pos.w;
+        false
     }
-
-    // -----------------
-    // UV --------------
-    // -----------------
-
-    /// returns the (0.0, 0.0) .. (1.0, 1.0) position within the viewport for the current render target
-    /// [0 .. render target viewport size] eg. [(0.0, 0.0) .. (1280.0, 720.0)] to [(0.0, 0.0) .. (1.0, 1.0)]
-    pub fn frag_coord_to_uv(&self, frag_coord: Vec2) -> Vec2 {
-        (frag_coord - self.viewport.xy()) / self.viewport.zw()
+    pub fn released(&self, index: usize) -> bool {
+        if let Some(state_item) = self.get_hovered(index) {
+            if let Some(input) = &state_item.input {
+                return input.just_released(MouseButton::Left);
+            }
+        }
+        false
     }
-
-    /// Convert frag coord to ndc
-    pub fn frag_coord_to_ndc(&self, frag_coord: Vec4) -> Vec3 {
-        uv_to_ndc(self.frag_coord_to_uv(frag_coord.xy())).extend(frag_coord.z)
+    pub fn bbox(&self, index: usize) -> Vec4 {
+        let item = self.get(index);
+        if item.position_3d {
+            if let Some(state_item) = self.get_state(index) {
+                return state_item.bbox;
+            }
+        } else {
+            return get_bbox(item.rect, item.position.xy(), &item.rect_anchor);
+        }
+        Vec4::ZERO
+    }
+    pub fn hovered(&self, index: usize) -> bool {
+        self.get_hovered(index).is_some()
+    }
+    pub fn add(&mut self, mut item: PicoItem) -> &mut Self {
+        if !item.position_3d {
+            while (self.stack_guard.get() as usize) < self.stack_stack.len() {
+                self.stack_stack.pop();
+            }
+            if !self.stack_stack.is_empty() {
+                let stack = self.stack_stack.last_mut().unwrap();
+                if stack.vertical {
+                    item.position.y += stack.end + stack.margin;
+                    stack.end = stack
+                        .end
+                        .max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).w);
+                } else {
+                    item.position.x += stack.end + stack.margin;
+                    stack.end = stack
+                        .end
+                        .max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).z);
+                }
+            }
+            if let Some(parent) = item.parent {
+                let parent_2d_bbox = self.bbox(parent);
+                let parent_z = self.get(parent).position.z;
+                item.position.z += parent_z;
+                if item.position.z == parent_z {
+                    // Make sure child is in front of parent if they were at the same z
+                    item.position.z += 0.000001;
+                }
+                item.position = lerp(parent_2d_bbox.xy(), parent_2d_bbox.zw(), item.position.xy())
+                    .extend(item.position.z);
+                item.rect *= (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
+            }
+        }
+        if self.window_ratio_mode_enabled.get() > 0 {
+            if !item.position_3d {
+                if item.parent.is_none() {
+                    item.position.x *= self.window_ratio;
+                }
+            }
+            if item.parent.is_none() {
+                item.rect.x *= self.window_ratio;
+            }
+        }
+        if item.spatial_id.is_none() {
+            item.spatial_id = Some(item.generate_spatial_id());
+        }
+        self.items.push(item);
+        self
+    }
+    pub fn get_state_mut(&mut self, index: usize) -> Option<&mut StateItem> {
+        self.state.get_mut(&self.get(index).spatial_id.unwrap())
+    }
+    pub fn get_state(&self, index: usize) -> Option<&StateItem> {
+        self.state.get(&self.get(index).spatial_id.unwrap())
+    }
+    pub fn get_mut(&mut self, index: usize) -> &mut PicoItem {
+        if index >= self.items.len() {
+            panic!(
+                "Tried to access item {} but there are only {}",
+                index,
+                self.items.len()
+            );
+        }
+        &mut self.items[index]
+    }
+    pub fn get(&self, index: usize) -> &PicoItem {
+        if index >= self.items.len() {
+            panic!(
+                "Tried to access item {} but there are only {}",
+                index,
+                self.items.len()
+            );
+        }
+        &self.items[index]
+    }
+    pub fn last(&self) -> usize {
+        (self.items.len() - 1).max(0)
     }
 }
 
-/// Convert ndc space xy coordinate [-1.0 .. 1.0] to uv [0.0 .. 1.0]
-pub fn ndc_to_uv(ndc: Vec2) -> Vec2 {
-    ndc * vec2(0.5, -0.5) + Vec2::splat(0.5)
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Drag {
+    pub start: Vec2,
+    pub end: Vec2,
+    pub last_frame: Vec2,
 }
 
-/// Convert uv [0.0 .. 1.0] coordinate to ndc space xy [-1.0 .. 1.0]
-pub fn uv_to_ndc(uv: Vec2) -> Vec2 {
-    (uv - Vec2::splat(0.5)) * vec2(2.0, -2.0)
+impl Drag {
+    pub fn delta(&self) -> Vec2 {
+        self.end - self.last_frame
+    }
+    pub fn total_delta(&self) -> Vec2 {
+        self.end - self.start
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct StateItem {
+    pub entity: Option<Entity>,
+    pub life: f32,
+    pub hover: bool,
+    pub interactable: bool,
+    pub toggle_state: bool,
+    pub drag: Option<Drag>,
+    pub id: u64,
+    pub input: Option<Input<MouseButton>>,
+    pub bbox: Vec4,
+}
+
+#[derive(Component)]
+pub struct PicoEntity(u64);
+
+#[allow(clippy::too_many_arguments)]
+fn render(
+    mut commands: Commands,
+    time: Res<Time>,
+    item_entities: Query<(Entity, &PicoItem)>,
+    camera: Query<(&Camera, &GlobalTransform), With<Pico2dCamera>>,
+    windows: Query<&Window>,
+    mut pico: ResMut<Pico>,
+    mut pico_entites: Query<(Entity, &mut Transform, Option<&Sprite>, &PicoEntity)>,
+    mouse_button_input: Res<Input<MouseButton>>,
+    mut currently_dragging: Local<bool>,
+) {
+    let Ok((camera, camera_transform)) = camera.get_single() else {
+        return;
+    };
+    let Ok(window) = windows.get_single() else {
+        return;
+    };
+    let window_size = Vec2::new(window.width(), window.height());
+
+    *currently_dragging = false;
+    let mut interacting = false;
+    // Age all the state items
+    for (_, state_item) in pico.state.iter_mut() {
+        state_item.life -= time.delta_seconds();
+        state_item.hover = false;
+        state_item.input = None;
+        if mouse_button_input.pressed(MouseButton::Left) {
+            if state_item.drag.is_some() {
+                *currently_dragging = true;
+                interacting = true;
+            }
+        } else {
+            state_item.drag = None;
+        }
+    }
+
+    let mut items = std::mem::take(&mut pico.items);
+
+    // Move PicoItem entites to local set
+    for (imtext_entity, item) in &item_entities {
+        items.push(item.clone());
+        commands.entity(imtext_entity).despawn();
+    }
+
+    // Sort so we interact in z order.
+    items.sort_by(|a, b| a.position.z.partial_cmp(&b.position.z).unwrap());
+
+    let mut first_interact_found = false;
+
+    for item in &mut items {
+        if item.id.is_none() {
+            item.id = Some(item.generate_id());
+        }
+        if item.spatial_id.is_none() {
+            item.spatial_id = Some(item.generate_spatial_id());
+        }
+        let spatial_id = item.spatial_id.unwrap();
+
+        let text_ndc = if item.position_3d {
+            camera
+                .world_to_ndc(camera_transform, item.position)
+                .unwrap_or(Vec3::NAN)
+        } else {
+            ((item.position.xy() - Vec2::splat(0.5)) * vec2(2.0, -2.0)).extend(item.position.z)
+        };
+
+        let text_pos = text_ndc.xy() * window_size * 0.5;
+
+        let generate = if let Some(existing_state_item) = pico.state.get_mut(&spatial_id) {
+            // If a item in the state matches one created this frame keep it around
+            existing_state_item.life = existing_state_item.life.max(0.0);
+            let Ok((_, mut trans, sprite, _)) =
+                pico_entites.get_mut(existing_state_item.entity.unwrap())
+            else {
+                continue;
+            };
+            trans.translation = text_pos.extend(text_ndc.z);
+
+            if !existing_state_item.interactable {
+                continue;
+            }
+
+            if let Some(sprite) = sprite {
+                if let Some(custom_size) = sprite.custom_size {
+                    if let Some(cursor_pos) = window.cursor_position() {
+                        if mouse_button_input.pressed(MouseButton::Left) && !first_interact_found {
+                            if let Some(drag) = &mut existing_state_item.drag {
+                                drag.last_frame = drag.end;
+                                drag.end = cursor_pos;
+                            }
+                        }
+                        existing_state_item.bbox = get_bbox(
+                            custom_size / window_size,
+                            trans.translation.xy() / window_size * vec2(1.0, -1.0) + 0.5,
+                            &sprite.anchor,
+                        );
+                        let xy = existing_state_item.bbox.xy() * window_size;
+                        let zw = existing_state_item.bbox.zw() * window_size;
+                        if cursor_pos.cmpge(xy).all() && cursor_pos.cmple(zw).all() {
+                            existing_state_item.hover = true;
+                            if !first_interact_found {
+                                existing_state_item.input = Some(mouse_button_input.clone());
+                                if mouse_button_input.any_just_pressed([
+                                    MouseButton::Left,
+                                    MouseButton::Right,
+                                    MouseButton::Middle,
+                                ]) {
+                                    interacting = true;
+                                    first_interact_found = true;
+                                }
+                                if mouse_button_input.just_pressed(MouseButton::Left)
+                                    && !*currently_dragging
+                                    && existing_state_item.drag.is_none()
+                                {
+                                    existing_state_item.drag = Some(Drag {
+                                        start: cursor_pos,
+                                        end: cursor_pos,
+                                        last_frame: cursor_pos,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            existing_state_item.id != item.id.unwrap()
+        } else {
+            true
+        };
+        if generate || pico.window_size != window_size {
+            let state_item = if let Some(old_state_item) = pico.state.get_mut(&spatial_id) {
+                let entity = old_state_item.entity.unwrap();
+                if pico_entites.get(entity).is_ok() {
+                    commands.entity(entity).despawn_recursive();
+                }
+                old_state_item
+            } else {
+                pico.state.insert(spatial_id, StateItem::default());
+                pico.state.get_mut(&spatial_id).unwrap()
+            };
+            let text = Text {
+                sections: vec![TextSection::new(
+                    item.text.clone(),
+                    TextStyle {
+                        font_size: item.font_size * window_size.y,
+                        color: item.color,
+                        ..default()
+                    },
+                )],
+                alignment: item.alignment,
+                linebreak_behavior: BreakLineOn::WordBoundary,
+            };
+            state_item.life = item.life;
+            state_item.id = item.id.unwrap();
+            if item.rect.x.is_finite() && item.rect.y.is_finite() {
+                let rect = item.rect * window_size;
+                let sprite = Sprite {
+                    color: item.background,
+                    custom_size: Some(rect),
+                    anchor: item.rect_anchor.clone(),
+                    ..default()
+                };
+                let trans = Transform::from_translation(text_pos.extend(1.0));
+                let entity = commands
+                    .spawn((
+                        SpriteBundle {
+                            sprite: sprite.clone(),
+                            transform: trans,
+                            ..default()
+                        },
+                        PicoEntity(spatial_id),
+                    ))
+                    .with_children(|builder| {
+                        builder.spawn(Text2dBundle {
+                            text,
+                            text_anchor: item.anchor.clone(),
+                            transform: Transform::from_translation(
+                                (rect * -(item.rect_anchor.as_vec() - item.anchor.as_vec()))
+                                    .extend(0.001),
+                            ),
+                            text_2d_bounds: Text2dBounds { size: rect },
+                            ..default()
+                        });
+                    })
+                    .id();
+                state_item.bbox = get_bbox(
+                    item.rect,
+                    trans.translation.xy() / window_size * vec2(1.0, -1.0) + 0.5,
+                    &sprite.anchor,
+                );
+                state_item.interactable = true;
+                state_item.entity = Some(entity);
+            } else {
+                let entity = commands
+                    .spawn(Text2dBundle {
+                        text,
+                        text_anchor: item.anchor.clone(),
+                        transform: Transform::from_translation(text_pos.extend(1.0)),
+                        ..default()
+                    })
+                    .id();
+                state_item.entity = Some(entity);
+            }
+        }
+    }
+
+    for (_, state_item) in pico.state.iter_mut() {
+        let entity = state_item.entity.unwrap();
+        // Remove that are no longer in use
+        if state_item.life < 0.0 && pico_entites.get(entity).is_ok() {
+            commands.entity(entity).despawn_recursive();
+        }
+    }
+
+    for (entity, _, _, pico_entity) in &pico_entites {
+        // Remove any orphaned
+        if pico.state.get(&pico_entity.0).is_none() {
+            commands.entity(entity).despawn_recursive();
+        }
+    }
+
+    // clean up state
+    pico.state.retain(|_, state_item| state_item.life >= 0.0);
+    pico.interacting = interacting;
+    pico.window_size = window_size;
+    pico.window_ratio = window_size.y / window_size.x;
+    pico.window_ratio_right = window_size.x / window_size.y;
+}
+
+fn get_bbox(rect: Vec2, uv_position: Vec2, anchor: &Anchor) -> Vec4 {
+    let half_size = rect * 0.5;
+    let a = uv_position - half_size + rect * -anchor.as_vec() * vec2(1.0, -1.0);
+    let b = uv_position + half_size + rect * -anchor.as_vec() * vec2(1.0, -1.0);
+    vec4(a.x, a.y, b.x, b.y)
 }
