@@ -223,7 +223,7 @@ fn update(
                 label,
                 scale,
                 value,
-                Some(side_bar),
+                [side_bar; 4],
                 Some(&mut char_input_events),
             );
             if relative {
@@ -245,12 +245,12 @@ fn update(
             rect: vec2(1.0, 0.03),
             text: "Camera".into(),
             rect_anchor: Anchor::TopLeft,
-            parent: Some(side_bar),
+            parent: [side_bar; 4],
             ..default()
         })
         .last();
 
-        hr(&mut pico, 0.95, 0.002, side_bar);
+        hr(&mut pico, 0.95, 0.002, [side_bar; 4]);
 
         let dv = tdrag(&mut pico, RED, "Local X", 0.0, true);
         let v = trans.right();
@@ -264,7 +264,7 @@ fn update(
         let v = trans.up();
         trans.translation += v * dv.value;
 
-        hr(&mut pico, 0.95, 0.002, side_bar);
+        hr(&mut pico, 0.95, 0.002, [side_bar; 4]);
 
         let dv = tdrag(&mut pico, RED, "World X", trans.translation.x, false);
         trans.translation.x = dv.value;
@@ -275,7 +275,7 @@ fn update(
         let dv = tdrag(&mut pico, BLUE, "World Z", trans.translation.z, false);
         trans.translation.z = dv.value;
 
-        hr(&mut pico, 0.95, 0.002, side_bar);
+        hr(&mut pico, 0.95, 0.002, [side_bar; 4]);
 
         let btn = button(
             &mut pico,
@@ -284,7 +284,7 @@ fn update(
                 rect: vec2(0.9, 0.04),
                 background: DARK_GRAY,
                 text: "RESET CAMERA".to_string(),
-                parent: Some(side_bar),
+                parent: [side_bar; 4],
                 ..default()
             },
         );

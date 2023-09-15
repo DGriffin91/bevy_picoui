@@ -97,16 +97,18 @@ pub fn toggle_button(
 // Horizontal ruler example widget
 // -------------------------
 
-/// Width is relative to parent, height is relative to window height (so that the height is consistent for all parents)
-pub fn hr(pico: &mut Pico, width: f32, height: f32, parent: usize) -> usize {
-    let height = pico.window_uv_for_parent(vec2(0.0, height), parent).y;
+/// Width is relative to parent. Height-y parent is removed so height is only relative to screen height
+/// so HRs are of a consistent height for the same input height.
+pub fn hr(pico: &mut Pico, width: f32, absolute_height: f32, parent: [usize; 4]) -> usize {
+    let mut parent = parent;
+    parent[3] = usize::MAX;
     let index = pico.last();
     pico.add(PicoItem {
         position: vec3(0.5, 0.0, 0.0),
-        rect: vec2(width, height),
+        rect: vec2(width, absolute_height),
         background: Color::rgba(1.0, 1.0, 1.0, 0.04),
         rect_anchor: Anchor::TopCenter,
-        parent: Some(parent),
+        parent,
         ..default()
     });
     index
@@ -132,7 +134,7 @@ pub fn drag_value(
     label: &str,
     scale: f32,
     value: f32,
-    parent: Option<usize>,
+    parent: [usize; 4],
     char_input_events: Option<&mut EventReader<ReceivedCharacter>>,
 ) -> DragValue {
     let mut value = value;
@@ -286,6 +288,7 @@ pub struct PicoItem {
     pub alignment: TextAlignment,
     pub anchor: Anchor,
     pub rect_anchor: Anchor,
+    pub parent_anchor: Anchor,
     /// A button must also have a non Vec2::INFINITY rect.
     pub button: bool,
     /// If life is 0.0, it will only live one frame (default), if life is f32::INFINITY it will live forever.
@@ -296,7 +299,8 @@ pub struct PicoItem {
     /// Impacted by position, rect, rect_anchor (after transform from parent is applied, if any)
     pub spatial_id: Option<u64>,
     /// If set, coordinates for position/rect will be relative to parent.
-    pub parent: Option<usize>,
+    /// With one parent, x and y for position and rect will be relative to the respective axes of the parent.
+    pub parent: [usize; 4],
     // Coordinates are uv space 0..1 over the whole window
     pub computed_bbox: Option<Vec4>,
 }
@@ -314,11 +318,12 @@ impl Default for PicoItem {
             alignment: TextAlignment::Center,
             anchor: Anchor::Center,
             rect_anchor: Anchor::Center,
+            parent_anchor: Anchor::TopLeft,
             button: false,
             life: 0.0,
             id: None,
             spatial_id: None,
-            parent: None,
+            parent: [usize::MAX; 4],
             computed_bbox: None,
         }
     }
@@ -374,7 +379,11 @@ impl PartialEq for PicoItem {
     }
 }
 
-fn lerp(start: Vec2, end: Vec2, t: Vec2) -> Vec2 {
+pub fn lerp2(start: Vec2, end: Vec2, t: Vec2) -> Vec2 {
+    (1.0 - t) * start + t * end
+}
+
+pub fn lerp(start: f32, end: f32, t: f32) -> f32 {
     (1.0 - t) * start + t * end
 }
 
@@ -475,8 +484,8 @@ impl Pico {
     }
     /// Take a uv for relative to the window (0.0, 0.0 at top left, 1.0, 1.0 bottom right)
     /// And get the corresponding uv inside the given parent
-    pub fn window_uv_for_parent(&self, window_uv: Vec2, parent: usize) -> Vec2 {
-        let bbox = self.bbox(parent);
+    pub fn window_uv_for_parent(&self, window_uv: Vec2, parent: [usize; 4]) -> Vec2 {
+        let bbox = self.bbox(parent[0]);
         (window_uv - bbox.xy()) / (bbox.zw() - bbox.xy()).abs()
     }
     pub fn hovered(&self, index: usize) -> bool {
@@ -501,17 +510,34 @@ impl Pico {
                         .max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).z);
                 }
             }
-            if let Some(parent) = item.parent {
-                let parent_2d_bbox = self.bbox(parent);
-                let parent_z = self.get(parent).position.z;
-                item.position.z += parent_z;
-                if item.position.z == parent_z {
+            {
+                let parent_2d_bbox = item.parent.map(|p| {
+                    if p == usize::MAX {
+                        vec4(0.0, 0.0, 1.0, 1.0)
+                    } else {
+                        self.bbox(p)
+                    }
+                });
+                let mut min_z = f32::NEG_INFINITY;
+                item.parent.map(|p| {
+                    min_z = if p == usize::MAX {
+                        0.0
+                    } else {
+                        min_z.max(self.get(p).position.z)
+                    }
+                });
+                item.position.z += min_z;
+                if item.position.z == min_z {
                     // Make sure child is in front of parent if they were at the same z
                     item.position.z += 0.000001;
                 }
-                item.position = lerp(parent_2d_bbox.xy(), parent_2d_bbox.zw(), item.position.xy())
-                    .extend(item.position.z);
-                item.rect *= (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
+                let pa_vec = item.parent_anchor.as_vec() * vec2(1.0, -1.0);
+                item.position *= (-pa_vec * 2.0).extend(1.0);
+                item.position += (pa_vec + vec2(0.5, 0.5)).extend(0.0);
+                item.position.x = lerp(parent_2d_bbox[0].x, parent_2d_bbox[0].z, item.position.x);
+                item.position.y = lerp(parent_2d_bbox[1].y, parent_2d_bbox[1].w, item.position.y);
+                item.rect.x *= (parent_2d_bbox[2].z - parent_2d_bbox[2].x).abs();
+                item.rect.y *= (parent_2d_bbox[3].w - parent_2d_bbox[3].y).abs();
             }
         }
         if item.spatial_id.is_none() {
