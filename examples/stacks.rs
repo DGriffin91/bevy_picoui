@@ -88,7 +88,7 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
                     rect: vec2(1.0, 0.08),
                     background: CURRENT,
                     rect_anchor: Anchor::TopLeft,
-                    parent: [main_box; 4],
+                    parent: Some(main_box),
                     ..default()
                 })
                 .last();
@@ -102,7 +102,7 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
                             rect: vec2(0.05, 0.8),
                             background: OILVINE,
                             rect_anchor: Anchor::TopLeft,
-                            parent: [lane; 4],
+                            parent: Some(lane),
                             ..default()
                         },
                         OILVINE + Color::DARK_GRAY,

@@ -65,7 +65,7 @@ fn update(mut pico: ResMut<Pico>) {
             parent_anchor: parent_anchor.clone(),
             rect: vec2(0.1, 0.1),
             background: BURNT_RED,
-            parent: [main_box; 4],
+            parent: Some(main_box),
             ..default()
         })
         .last();
@@ -74,7 +74,7 @@ fn update(mut pico: ResMut<Pico>) {
             parent_anchor,
             rect: vec2(0.04, 0.04),
             background: CURRENT,
-            parent: [main_box; 4],
+            parent: Some(main_box),
             ..default()
         })
         .last();

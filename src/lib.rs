@@ -99,13 +99,11 @@ pub fn toggle_button(
 
 /// Width is relative to parent. Height-y parent is removed so height is only relative to screen height
 /// so HRs are of a consistent height for the same input height.
-pub fn hr(pico: &mut Pico, width: f32, absolute_height: f32, parent: [usize; 4]) -> usize {
-    let mut parent = parent;
-    parent[3] = usize::MAX;
+pub fn hr(pico: &mut Pico, rect: Vec2, parent: Option<usize>) -> usize {
     let index = pico.last();
     pico.add(PicoItem {
         position: vec3(0.5, 0.0, 0.0),
-        rect: vec2(width, absolute_height),
+        rect,
         background: Color::rgba(1.0, 1.0, 1.0, 0.04),
         rect_anchor: Anchor::TopCenter,
         parent,
@@ -134,7 +132,7 @@ pub fn drag_value(
     label: &str,
     scale: f32,
     value: f32,
-    parent: [usize; 4],
+    parent: Option<usize>,
     char_input_events: Option<&mut EventReader<ReceivedCharacter>>,
 ) -> DragValue {
     let mut value = value;
@@ -299,8 +297,7 @@ pub struct PicoItem {
     /// Impacted by position, rect, rect_anchor (after transform from parent is applied, if any)
     pub spatial_id: Option<u64>,
     /// If set, coordinates for position/rect will be relative to parent.
-    /// With one parent, x and y for position and rect will be relative to the respective axes of the parent.
-    pub parent: [usize; 4],
+    pub parent: Option<usize>,
     // Coordinates are uv space 0..1 over the whole window
     pub computed_bbox: Option<Vec4>,
 }
@@ -323,7 +320,7 @@ impl Default for PicoItem {
             life: 0.0,
             id: None,
             spatial_id: None,
-            parent: [usize::MAX; 4],
+            parent: None,
             computed_bbox: None,
         }
     }
@@ -511,33 +508,24 @@ impl Pico {
                 }
             }
             {
-                let parent_2d_bbox = item.parent.map(|p| {
-                    if p == usize::MAX {
-                        vec4(0.0, 0.0, 1.0, 1.0)
-                    } else {
-                        self.bbox(p)
+                let parent_2d_bbox = if let Some(parent) = item.parent {
+                    let parent_z = self.get(parent).position.z;
+                    item.position.z += parent_z;
+                    if item.position.z == parent_z {
+                        // Make sure child is in front of parent if they were at the same z
+                        item.position.z += 0.000001;
                     }
-                });
-                let mut min_z = f32::NEG_INFINITY;
-                item.parent.map(|p| {
-                    min_z = if p == usize::MAX {
-                        0.0
-                    } else {
-                        min_z.max(self.get(p).position.z)
-                    }
-                });
-                item.position.z += min_z;
-                if item.position.z == min_z {
-                    // Make sure child is in front of parent if they were at the same z
-                    item.position.z += 0.000001;
-                }
+                    self.bbox(parent)
+                } else {
+                    vec4(0.0, 0.0, 1.0, 1.0)
+                };
+
                 let pa_vec = item.parent_anchor.as_vec() * vec2(1.0, -1.0);
                 item.position *= (-pa_vec * 2.0).extend(1.0);
                 item.position += (pa_vec + vec2(0.5, 0.5)).extend(0.0);
-                item.position.x = lerp(parent_2d_bbox[0].x, parent_2d_bbox[0].z, item.position.x);
-                item.position.y = lerp(parent_2d_bbox[1].y, parent_2d_bbox[1].w, item.position.y);
-                item.rect.x *= (parent_2d_bbox[2].z - parent_2d_bbox[2].x).abs();
-                item.rect.y *= (parent_2d_bbox[3].w - parent_2d_bbox[3].y).abs();
+                item.position = lerp2(parent_2d_bbox.xy(), parent_2d_bbox.zw(), item.position.xy())
+                    .extend(item.position.z);
+                item.rect *= (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
             }
         }
         if item.spatial_id.is_none() {
