@@ -70,9 +70,9 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
     let vh = pico.vh;
     let main_box = pico
         .add(PicoItem {
-            position: vec3(0.1 * vh, 0.5, 0.0),
+            position: vec2(0.1 * vh, 0.5),
             rect_anchor: Anchor::CenterLeft,
-            rect: vec2(0.5 * vh, 0.5),
+            size: vec2(0.5 * vh, 0.5),
             background: SLATE,
             ..default()
         })
@@ -84,8 +84,8 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
         for row in &mut toggle_states {
             let lane = pico
                 .add(PicoItem {
-                    position: vec3(0.0, 0.0, 0.0),
-                    rect: vec2(1.0, 0.08),
+                    position: vec2(0.0, 0.0),
+                    size: vec2(1.0, 0.08),
                     background: CURRENT,
                     rect_anchor: Anchor::TopLeft,
                     parent: Some(main_box),
@@ -98,8 +98,8 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
                     toggle_button(
                         &mut pico,
                         PicoItem {
-                            position: vec3(0.0, 0.1, 0.0),
-                            rect: vec2(0.05, 0.8),
+                            position: vec2(0.0, 0.1),
+                            size: vec2(0.05, 0.8),
                             background: OILVINE,
                             rect_anchor: Anchor::TopLeft,
                             parent: Some(lane),

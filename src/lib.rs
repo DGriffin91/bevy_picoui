@@ -1,7 +1,7 @@
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
     input::InputSystem,
-    math::{vec2, vec3, vec4, Vec3Swizzles, Vec4Swizzles},
+    math::{vec2, vec4, Vec3Swizzles, Vec4Swizzles},
     prelude::*,
     sprite::Anchor,
     text::{BreakLineOn, Text2dBounds},
@@ -99,11 +99,11 @@ pub fn toggle_button(
 
 /// Width is relative to parent. Height-y parent is removed so height is only relative to screen height
 /// so HRs are of a consistent height for the same input height.
-pub fn hr(pico: &mut Pico, rect: Vec2, parent: Option<usize>) -> usize {
+pub fn hr(pico: &mut Pico, size: Vec2, parent: Option<usize>) -> usize {
     let index = pico.last();
     pico.add(PicoItem {
-        position: vec3(0.5, 0.0, 0.0),
-        rect,
+        position: vec2(0.5, 0.0),
+        size,
         background: Color::rgba(1.0, 1.0, 1.0, 0.04),
         rect_anchor: Anchor::TopCenter,
         parent,
@@ -125,7 +125,7 @@ pub struct DragValue {
 pub fn drag_value(
     pico: &mut Pico,
     drag_bg: Color,
-    position: Vec3,
+    position: Vec2,
     height: f32,
     label_width: f32,
     drag_width: f32,
@@ -146,7 +146,7 @@ pub fn drag_value(
     let pico = pico.add(PicoItem {
         text: label.to_string(),
         position,
-        rect: vec2(label_width, height),
+        size: vec2(label_width, height),
         anchor: Anchor::CenterLeft,
         rect_anchor: Anchor::TopLeft,
         parent,
@@ -156,8 +156,8 @@ pub fn drag_value(
     let mut drag_item = PicoItem {
         // TODO user or auto precision
         text: format!("{:.2}", value),
-        position: position + Vec3::X * label_width,
-        rect: vec2(drag_width, height),
+        position: position + Vec2::X * label_width,
+        size: vec2(drag_width, height),
         parent,
         ..default()
     };
@@ -272,14 +272,16 @@ pub struct Pico2dCamera;
 #[derive(Component, Clone, Debug)]
 pub struct PicoItem {
     pub text: String,
-    /// If position_3d is false position is the screen uv coords with 0.0, 0.0 at top left
-    /// If position_3d is true position is the world space translation
     /// Don't change after pico.add()
-    pub position: Vec3,
-    pub position_3d: bool,
+    pub position_3d: Option<Vec3>,
+    /// Don't change after pico.add()
+    pub position: Vec2,
     /// 2d pixel coords. Text will center in rect if it is not Vec2::INFINITY.
     /// Don't change after pico.add()
-    pub rect: Vec2,
+    pub size: Vec2,
+    /// z position for 2d 1.0 is closer to camera 0.0 is further
+    /// None for auto (calculated by order)
+    pub depth: Option<f32>,
     pub font_size: f32,
     pub color: Color,
     pub background: Color,
@@ -305,9 +307,10 @@ pub struct PicoItem {
 impl Default for PicoItem {
     fn default() -> Self {
         PicoItem {
-            position: Vec3::ZERO,
-            position_3d: false,
-            rect: Vec2::INFINITY,
+            position: Vec2::ZERO,
+            position_3d: None,
+            depth: None,
+            size: Vec2::INFINITY,
             text: String::new(),
             font_size: 0.02,
             color: Color::WHITE,
@@ -327,18 +330,17 @@ impl Default for PicoItem {
 }
 
 impl PicoItem {
-    pub fn new2d(position: Vec3, text: &str) -> PicoItem {
+    pub fn new2d(position: Vec2, text: &str) -> PicoItem {
         PicoItem {
             position,
             text: text.to_string(),
             ..default()
         }
     }
-    pub fn new3d(position: Vec3, text: &str) -> PicoItem {
+    pub fn new3d(position_3d: Vec3, text: &str) -> PicoItem {
         PicoItem {
-            position,
+            position_3d: Some(position_3d),
             text: text.to_string(),
-            position_3d: true,
             ..default()
         }
     }
@@ -350,9 +352,16 @@ impl PicoItem {
         let hasher = &mut DefaultHasher::new();
         self.position.x.to_bits().hash(hasher);
         self.position.y.to_bits().hash(hasher);
-        self.position.z.to_bits().hash(hasher);
-        self.rect.x.to_bits().hash(hasher);
-        self.rect.y.to_bits().hash(hasher);
+        if let Some(depth) = self.depth {
+            depth.to_bits().hash(hasher);
+        }
+        if let Some(position_3d) = self.position_3d {
+            position_3d.x.to_bits().hash(hasher);
+            position_3d.y.to_bits().hash(hasher);
+            position_3d.z.to_bits().hash(hasher);
+        }
+        self.size.x.to_bits().hash(hasher);
+        self.size.y.to_bits().hash(hasher);
         format!("{:?}", self.rect_anchor).hash(hasher);
         hasher.finish()
     }
@@ -427,6 +436,7 @@ pub struct Pico {
     /// The right edge of the window after scaling by vh
     pub vh_right: f32,
     pub mouse_button_input: Option<Input<MouseButton>>,
+    pub auto_depth: f32,
 }
 
 impl Pico {
@@ -489,56 +499,62 @@ impl Pico {
         self.get_hovered(index).is_some()
     }
     pub fn add(&mut self, mut item: PicoItem) -> &mut Self {
-        if !item.position_3d {
-            while (self.stack_guard.get() as usize) < self.stack_stack.len() {
-                self.stack_stack.pop();
-            }
-            if !self.stack_stack.is_empty() {
-                let stack = self.stack_stack.last_mut().unwrap();
-                if stack.vertical {
-                    item.position.y += stack.end + stack.margin;
-                    stack.end = stack
-                        .end
-                        .max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).w);
-                } else {
-                    item.position.x += stack.end + stack.margin;
-                    stack.end = stack
-                        .end
-                        .max(get_bbox(item.rect, item.position.xy(), &item.rect_anchor).z);
-                }
-            }
-            {
-                let parent_2d_bbox = if let Some(parent) = item.parent {
-                    let parent_z = self.get(parent).position.z;
-                    item.position.z += parent_z;
-                    if item.position.z == parent_z {
-                        // Make sure child is in front of parent if they were at the same z
-                        item.position.z += 0.000001;
-                    }
-                    self.bbox(parent)
-                } else {
-                    vec4(0.0, 0.0, 1.0, 1.0)
-                };
-
-                let pa_vec = item.parent_anchor.as_vec() * vec2(1.0, -1.0);
-                item.position *= (-pa_vec * 2.0).extend(1.0);
-                item.position += (pa_vec + vec2(0.5, 0.5)).extend(0.0);
-                item.position = lerp2(parent_2d_bbox.xy(), parent_2d_bbox.zw(), item.position.xy())
-                    .extend(item.position.z);
-                item.rect *= (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
+        while (self.stack_guard.get() as usize) < self.stack_stack.len() {
+            self.stack_stack.pop();
+        }
+        if !self.stack_stack.is_empty() {
+            let stack = self.stack_stack.last_mut().unwrap();
+            if stack.vertical {
+                item.position.y += stack.end + stack.margin;
+                stack.end = stack
+                    .end
+                    .max(get_bbox(item.size, item.position, &item.rect_anchor).w);
+            } else {
+                item.position.x += stack.end + stack.margin;
+                stack.end = stack
+                    .end
+                    .max(get_bbox(item.size, item.position, &item.rect_anchor).z);
             }
         }
+        {
+            let parent_2d_bbox = if let Some(parent) = item.parent {
+                if let Some(depth) = &mut item.depth {
+                    if let Some(parent_depth) = self.get(parent).depth {
+                        *depth += parent_depth;
+                        if *depth == parent_depth {
+                            // Make sure child is in front of parent if they were at the same z
+                            *depth += 0.000001;
+                        }
+                    }
+                }
+                self.bbox(parent)
+            } else {
+                vec4(0.0, 0.0, 1.0, 1.0)
+            };
+
+            if item.depth.is_none() {
+                self.auto_depth += 0.00001;
+                item.depth = Some(self.auto_depth);
+            }
+
+            let pa_vec = item.parent_anchor.as_vec() * vec2(1.0, -1.0);
+            item.position *= -pa_vec * 2.0;
+            item.position += pa_vec + vec2(0.5, 0.5);
+            item.position = lerp2(parent_2d_bbox.xy(), parent_2d_bbox.zw(), item.position);
+            item.size *= (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
+        }
+
         if item.spatial_id.is_none() {
             item.spatial_id = Some(item.generate_spatial_id());
         }
-        item.computed_bbox = Some(if item.position_3d {
+        item.computed_bbox = Some(if item.position_3d.is_some() {
             if let Some(state_item) = self.state.get(&item.spatial_id.unwrap()) {
                 state_item.bbox
             } else {
                 Vec4::ZERO
             }
         } else {
-            get_bbox(item.rect, item.position.xy(), &item.rect_anchor)
+            get_bbox(item.size, item.position, &item.rect_anchor)
         });
         self.items.push(item);
         self
@@ -662,7 +678,7 @@ fn render(
     }
 
     // Sort so we interact in z order.
-    items.sort_by(|a, b| b.position.z.partial_cmp(&a.position.z).unwrap());
+    items.sort_by(|a, b| b.depth.unwrap().partial_cmp(&a.depth.unwrap()).unwrap());
 
     let mut first_interact_found = false;
 
@@ -675,13 +691,16 @@ fn render(
         }
         let spatial_id = item.spatial_id.unwrap();
 
-        let item_ndc = if item.position_3d {
-            camera
-                .world_to_ndc(camera_transform, item.position)
-                .unwrap_or(Vec3::NAN)
-        } else {
-            ((item.position.xy() - Vec2::splat(0.5)) * vec2(2.0, -2.0)).extend(item.position.z)
-        };
+        let mut item_ndc =
+            ((item.position - Vec2::splat(0.5)) * vec2(2.0, -2.0)).extend(item.depth.unwrap());
+
+        if let Some(position_3d) = item.position_3d {
+            item_ndc = camera
+                .world_to_ndc(camera_transform, position_3d)
+                .unwrap_or(Vec3::NAN);
+            // include 2d offset
+            item_ndc += ((item.position) * vec2(2.0, -2.0)).extend(item.depth.unwrap());
+        }
 
         let item_pos = item_ndc.xy() * window_size * 0.5;
 
@@ -771,8 +790,8 @@ fn render(
             };
             state_item.life = item.life;
             state_item.id = item.id.unwrap();
-            if item.rect.x.is_finite() && item.rect.y.is_finite() {
-                let rect = item.rect * window_size;
+            if item.size.x.is_finite() && item.size.y.is_finite() {
+                let rect = item.size * window_size;
                 let sprite = Sprite {
                     color: item.background,
                     custom_size: Some(rect),
@@ -803,7 +822,7 @@ fn render(
                     })
                     .id();
                 state_item.bbox = get_bbox(
-                    item.rect,
+                    item.size,
                     trans.translation.xy() / window_size * vec2(1.0, -1.0) + 0.5,
                     &sprite.anchor,
                 );
@@ -845,6 +864,7 @@ fn render(
     pico.vh = window_size.y / window_size.x;
     pico.vh_right = window_size.x / window_size.y;
     pico.mouse_button_input = Some(mouse_button_input.clone());
+    pico.auto_depth = 0.5;
 }
 
 fn get_bbox(rect: Vec2, uv_position: Vec2, anchor: &Anchor) -> Vec4 {

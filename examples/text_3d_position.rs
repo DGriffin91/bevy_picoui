@@ -78,7 +78,7 @@ struct ExampleCamera;
 
 fn update(mut gizmos: Gizmos, mut pico: ResMut<Pico>) {
     pico.add(PicoItem {
-        position: vec3(0.02, 0.02, 0.01),
+        position: vec2(0.02, 0.02),
         text: String::from("Click and drag to orbit camera\nDolly with scroll wheel\nMove with WASD\n\nHover over the Y axis text"),
         anchor: Anchor::TopLeft,
         ..default()
@@ -89,9 +89,8 @@ fn update(mut gizmos: Gizmos, mut pico: ResMut<Pico>) {
 
     // Add 3d text
     pico.add(PicoItem {
-        position: Vec3::Y * 1.1,
-        position_3d: true,
-        rect: vec2(0.02, 0.02),
+        position_3d: Some(Vec3::Y * 1.1),
+        size: vec2(0.02, 0.02),
         background: Color::rgba(0.1, 0.1, 0.1, 0.5),
         text: String::from("Y+"),
         rect_anchor: Anchor::TopLeft,
@@ -104,12 +103,12 @@ fn update(mut gizmos: Gizmos, mut pico: ResMut<Pico>) {
 
         // Get 2d bounding box of axis text
         let state = pico.get_state(axis_text_index).unwrap();
-        let position = vec3(state.bbox.x, state.bbox.w + 0.01, 0.1);
+        let position = vec2(state.bbox.x, state.bbox.w + 0.01);
 
         // Add 2d text
         pico.add(PicoItem {
             position,
-            rect: vec2(0.1, 0.02),
+            size: vec2(0.1, 0.02),
             background: Color::rgba(0.1, 0.1, 0.1, 0.8),
             text: String::from("HELLO WORLD"),
             rect_anchor: Anchor::TopLeft,

@@ -183,12 +183,12 @@ fn update(
     // Example instructions
     let right = pico.vh_right;
     pico.add(PicoItem {
-        position: vec3(right, 1.0, 0.0),
+        position: vec2(right, 1.0),
         text: String::from(
             "Click and drag to orbit camera\nDolly with scroll wheel\nMove with WASD",
         ),
         rect_anchor: Anchor::BottomRight,
-        rect: vec2(0.35, 0.1),
+        size: vec2(0.35, 0.1),
         alignment: TextAlignment::Right,
         background: Color::rgba(0.0, 0.0, 0.0, 0.3),
         ..default()
@@ -201,9 +201,9 @@ fn update(
 
     let side_bar = pico
         .add(PicoItem {
-            position: vec3(0.0, 0.0, 0.0),
+            position: vec2(0.0, 0.0),
             rect_anchor: Anchor::TopLeft,
-            rect: vec2(0.2 * vh, 1.0),
+            size: vec2(0.2 * vh, 1.0),
             alignment: TextAlignment::Left,
             background: Color::rgba(0.2, 0.2, 0.2, 0.2),
             ..default()
@@ -216,7 +216,7 @@ fn update(
             let dv = drag_value(
                 pico,
                 bg,
-                vec3(0.05, 0.0, 0.0),
+                vec2(0.05, 0.0),
                 0.025,
                 0.6,
                 0.3,
@@ -241,8 +241,8 @@ fn update(
     {
         let _guard = pico.vstack(0.02, 0.01);
         pico.add(PicoItem {
-            position: vec3(0.02, 0.0, 0.0),
-            rect: vec2(1.0, 0.03),
+            position: vec2(0.02, 0.0),
+            size: vec2(1.0, 0.03),
             text: "Camera".into(),
             rect_anchor: Anchor::TopLeft,
             parent: Some(side_bar),
@@ -280,8 +280,8 @@ fn update(
         let btn = button(
             &mut pico,
             PicoItem {
-                position: vec3(0.05, 0.0, 0.0),
-                rect: vec2(0.9, 0.04),
+                position: vec2(0.05, 0.0),
+                size: vec2(0.9, 0.04),
                 background: DARK_GRAY,
                 text: "RESET CAMERA".to_string(),
                 parent: Some(side_bar),
@@ -298,9 +298,8 @@ fn update(
     // Setup style for axis text
     let axis_text = |p: Vec3, s: &str| -> PicoItem {
         PicoItem {
-            position: p,
-            position_3d: true,
-            rect: vec2(0.02 * vh, 0.02),
+            position_3d: Some(p),
+            size: vec2(0.02 * vh, 0.02),
             background: Color::rgba(0.0, 0.0, 0.0, 0.3),
             text: s.to_string(),
             font_size: 0.02,
