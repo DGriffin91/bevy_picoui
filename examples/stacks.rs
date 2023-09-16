@@ -70,7 +70,7 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
     let main_box = pico.add(PicoItem {
         y: Val::Vh(50.0),
         x: Val::Vh(10.0),
-        width: Val::Vh(50.0),
+        width: Val::Vh(70.0),
         height: Val::Vh(50.0),
         anchor: Anchor::CenterLeft,
         background: SLATE,
@@ -98,6 +98,7 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
                             y: Val::Percent(50.0),
                             width: Val::Percent(9.0),
                             height: Val::Percent(80.0),
+                            corner_radius: Val::Percent(50.0),
                             background: OILVINE,
                             anchor: Anchor::CenterLeft,
                             parent: Some(lane),
