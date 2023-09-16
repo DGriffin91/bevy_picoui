@@ -6,13 +6,9 @@ use bevy::{
 };
 use core::hash::Hash;
 use core::hash::Hasher;
-use std::{
-    collections::hash_map::DefaultHasher,
-    sync::{
-        atomic::{AtomicI32, Ordering},
-        Arc,
-    },
-};
+use std::collections::hash_map::DefaultHasher;
+
+use crate::guard::Guard;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ItemIndex(pub usize);
@@ -146,33 +142,27 @@ impl PartialEq for PicoItem {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct StateItem {
+    pub entity: Option<Entity>,
+    pub life: f32,
+    pub hover: bool,
+    pub interactable: bool,
+    pub selected: bool,
+    pub drag: Option<Drag>,
+    pub id: u64,
+    pub input: Option<Input<MouseButton>>,
+    // Coordinates are uv space 0..1 over the whole window
+    pub bbox: Vec4,
+    pub storage: Option<Box<dyn std::any::Any + Send + Sync>>,
+}
+
 pub fn lerp2(start: Vec2, end: Vec2, t: Vec2) -> Vec2 {
     (1.0 - t) * start + t * end
 }
 
 pub fn lerp(start: f32, end: f32, t: f32) -> f32 {
     (1.0 - t) * start + t * end
-}
-
-#[derive(Default, Clone)]
-pub struct Guard(Arc<AtomicI32>);
-
-impl Guard {
-    pub fn push(&self) {
-        self.0.fetch_add(1, Ordering::Relaxed);
-    }
-    pub fn pop(&self) {
-        self.0.fetch_sub(1, Ordering::Relaxed);
-        self.0.fetch_max(0, Ordering::Relaxed);
-    }
-    pub fn get(&self) -> i32 {
-        self.0.load(Ordering::Relaxed)
-    }
-}
-impl Drop for Guard {
-    fn drop(&mut self) {
-        self.pop()
-    }
 }
 
 #[derive(Clone, Copy)]
@@ -208,6 +198,7 @@ impl Pico {
         self.stack_guard.push();
         self.stack_guard.clone()
     }
+
     pub fn hstack(&mut self, start: Val, margin: Val, parent: ItemIndex) -> Guard {
         let bbox = self.bbox(parent);
         let parent_size = (bbox.zw() - bbox.xy()).abs();
@@ -221,6 +212,7 @@ impl Pico {
         self.stack_guard.push();
         self.stack_guard.clone()
     }
+
     pub fn get_hovered(&self, index: ItemIndex) -> Option<&StateItem> {
         if let Some(state_item) = self.get_state(index) {
             if state_item.hover {
@@ -229,6 +221,7 @@ impl Pico {
         }
         None
     }
+
     pub fn clicked(&self, index: ItemIndex) -> bool {
         if let Some(state_item) = self.get_hovered(index) {
             if let Some(input) = &state_item.input {
@@ -237,6 +230,7 @@ impl Pico {
         }
         false
     }
+
     pub fn released(&self, index: ItemIndex) -> bool {
         if let Some(state_item) = self.get_hovered(index) {
             if let Some(input) = &state_item.input {
@@ -245,6 +239,7 @@ impl Pico {
         }
         false
     }
+
     pub fn bbox(&self, index: ItemIndex) -> Vec4 {
         let item = self.get(index);
         if let Some(computed_bbox) = item.computed_bbox {
@@ -252,9 +247,11 @@ impl Pico {
         }
         vec4(0.0, 0.0, 1.0, 1.0)
     }
+
     pub fn hovered(&self, index: ItemIndex) -> bool {
         self.get_hovered(index).is_some()
     }
+
     pub fn add(&mut self, mut item: PicoItem) -> ItemIndex {
         let parent_2d_bbox = if let Some(parent) = item.parent {
             if let Some(parent_depth) = self.get(parent).depth {
@@ -365,9 +362,11 @@ impl Pico {
     pub fn get_state_mut(&mut self, index: ItemIndex) -> Option<&mut StateItem> {
         self.state.get_mut(&self.get(index).spatial_id.unwrap())
     }
+
     pub fn get_state(&self, index: ItemIndex) -> Option<&StateItem> {
         self.state.get(&self.get(index).spatial_id.unwrap())
     }
+
     pub fn get_mut(&mut self, index: ItemIndex) -> &mut PicoItem {
         if index.0 >= self.items.len() {
             panic!(
@@ -378,6 +377,7 @@ impl Pico {
         }
         &mut self.items[index.0]
     }
+
     pub fn get(&self, index: ItemIndex) -> &PicoItem {
         if index.0 >= self.items.len() {
             panic!(
@@ -388,6 +388,7 @@ impl Pico {
         }
         &self.items[index.0]
     }
+
     pub fn storage(&mut self) -> Option<&mut Option<Box<dyn std::any::Any + Send + Sync>>> {
         if let Some(item) = self.items.last() {
             if let Some(state_item) = self.state.get_mut(&item.spatial_id.unwrap()) {
@@ -412,28 +413,6 @@ impl Drag {
     pub fn total_delta(&self) -> Vec2 {
         self.end - self.start
     }
-}
-
-#[derive(Debug, Default)]
-pub struct StateItem {
-    pub entity: Option<Entity>,
-    pub life: f32,
-    pub hover: bool,
-    pub interactable: bool,
-    pub selected: bool,
-    pub drag: Option<Drag>,
-    pub id: u64,
-    pub input: Option<Input<MouseButton>>,
-    // Coordinates are uv space 0..1 over the whole window
-    pub bbox: Vec4,
-    pub storage: Option<Box<dyn std::any::Any + Send + Sync>>,
-}
-
-#[derive(Component)]
-pub struct PicoEntity {
-    pub spatial_id: u64,
-    pub anchor: Anchor,
-    pub size: Vec2,
 }
 
 pub fn get_bbox(size: Vec2, uv_position: Vec2, anchor: &Anchor) -> Vec4 {

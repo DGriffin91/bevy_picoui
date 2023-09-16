@@ -1,7 +1,7 @@
 use bevy::{
     math::{vec2, vec3, Vec3Swizzles, Vec4Swizzles},
     prelude::*,
-    sprite::MaterialMesh2dBundle,
+    sprite::{Anchor, MaterialMesh2dBundle},
     text::{BreakLineOn, Text2dBounds},
     utils::HashMap,
 };
@@ -10,9 +10,16 @@ use core::hash::Hasher;
 use std::{collections::hash_map::DefaultHasher, f32::consts::PI};
 
 use crate::{
-    pico::{get_bbox, Drag, Pico, Pico2dCamera, PicoEntity, StateItem},
+    pico::{get_bbox, Drag, Pico, Pico2dCamera, StateItem},
     MeshHandles,
 };
+
+#[derive(Component)]
+pub struct PicoEntity {
+    pub spatial_id: u64,
+    pub anchor: Anchor,
+    pub size: Vec2,
+}
 
 #[allow(clippy::too_many_arguments)]
 pub fn render(
@@ -213,69 +220,17 @@ pub fn render(
 
                 entity.with_children(|builder| {
                     let item_anchor_vec = item.anchor.as_vec();
-                    let cr2 = corner_radius * 2.0;
                     if item.background.a() > 0.0 {
                         let anchor_trans = (-item_anchor_vec * size).extend(0.0);
-                        if corner_radius <= 0.0 {
-                            builder.spawn(MaterialMesh2dBundle {
-                                mesh: mesh_handles.rect.clone(),
-                                material: material_handle.clone(),
-                                transform: Transform::from_translation(anchor_trans)
-                                    .with_scale(size.extend(1.0)),
-                                ..default()
-                            });
-                        } else {
-                            // Don't bother making rectangles if corner_radius just results in circle
-                            if corner_radius < size.x && corner_radius < size.y {
-                                // Make cross shape with gaps for the arcs
-                                builder.spawn(MaterialMesh2dBundle {
-                                    mesh: mesh_handles.rect.clone(),
-                                    material: material_handle.clone(),
-                                    transform: Transform::from_translation(anchor_trans)
-                                        .with_scale((size - vec2(cr2, 0.0)).extend(1.0)),
-                                    ..default()
-                                });
-                                // Don't bother making side rectangles if corner_radius just results in half circles on the ends
-                                if corner_radius < size.y {
-                                    let s = vec2(corner_radius, size.y - cr2).extend(1.0);
-                                    let off = vec3((size.x - corner_radius) * 0.5, 0.0, 0.0);
-                                    builder.spawn(MaterialMesh2dBundle {
-                                        mesh: mesh_handles.rect.clone(),
-                                        material: material_handle.clone(),
-                                        transform: Transform::from_translation(anchor_trans + off)
-                                            .with_scale(s),
-                                        ..default()
-                                    });
-                                    builder.spawn(MaterialMesh2dBundle {
-                                        mesh: mesh_handles.rect.clone(),
-                                        material: material_handle.clone(),
-                                        transform: Transform::from_translation(anchor_trans - off)
-                                            .with_scale(s),
-                                        ..default()
-                                    });
-                                }
-                            }
-                            // Add arcs for corners
-                            for (offset, angle) in [
-                                (size - cr2, 0.0),
-                                (vec2(0.0, size.y - cr2), PI * 0.5),
-                                (vec2(0.0, 0.0), PI),
-                                (vec2(size.x - cr2, 0.0), PI * 1.5),
-                            ] {
-                                let offset = offset + corner_radius;
-                                builder.spawn(MaterialMesh2dBundle {
-                                    mesh: mesh_handles.circle.clone(),
-                                    material: material_handle.clone(),
-                                    transform: Transform::from_translation(
-                                        (offset + size * (-item_anchor_vec - 0.5))
-                                            .extend(0.00000005),
-                                    )
-                                    .with_scale(Vec3::splat(corner_radius))
-                                    .with_rotation(Quat::from_rotation_z(angle)),
-                                    ..default()
-                                });
-                            }
-                        }
+                        generate_rect_entities(
+                            corner_radius,
+                            builder,
+                            &mesh_handles,
+                            material_handle,
+                            anchor_trans,
+                            size,
+                            item_anchor_vec,
+                        );
                     }
 
                     builder.spawn(Text2dBundle {
@@ -330,4 +285,72 @@ pub fn render(
     pico.window_size = window_size;
     pico.mouse_button_input = Some(mouse_button_input.clone());
     pico.auto_depth = 0.5;
+}
+
+fn generate_rect_entities(
+    corner_radius: f32,
+    builder: &mut ChildBuilder,
+    mesh_handles: &MeshHandles,
+    material_handle: Handle<ColorMaterial>,
+    anchor_trans: Vec3,
+    size: Vec2,
+    item_anchor_vec: Vec2,
+) {
+    if corner_radius <= 0.0 {
+        builder.spawn(MaterialMesh2dBundle {
+            mesh: mesh_handles.rect.clone(),
+            material: material_handle.clone(),
+            transform: Transform::from_translation(anchor_trans).with_scale(size.extend(1.0)),
+            ..default()
+        });
+    } else {
+        let cr2 = corner_radius * 2.0;
+        // Don't bother making rectangles if corner_radius just results in circle
+        if corner_radius < size.x && corner_radius < size.y {
+            // Make cross shape with gaps for the arcs
+            builder.spawn(MaterialMesh2dBundle {
+                mesh: mesh_handles.rect.clone(),
+                material: material_handle.clone(),
+                transform: Transform::from_translation(anchor_trans)
+                    .with_scale((size - vec2(cr2, 0.0)).extend(1.0)),
+                ..default()
+            });
+            // Don't bother making side rectangles if corner_radius just results in half circles on the ends
+            if corner_radius < size.y {
+                let s = vec2(corner_radius, size.y - cr2).extend(1.0);
+                let off = vec3((size.x - corner_radius) * 0.5, 0.0, 0.0);
+                builder.spawn(MaterialMesh2dBundle {
+                    mesh: mesh_handles.rect.clone(),
+                    material: material_handle.clone(),
+                    transform: Transform::from_translation(anchor_trans + off).with_scale(s),
+                    ..default()
+                });
+                builder.spawn(MaterialMesh2dBundle {
+                    mesh: mesh_handles.rect.clone(),
+                    material: material_handle.clone(),
+                    transform: Transform::from_translation(anchor_trans - off).with_scale(s),
+                    ..default()
+                });
+            }
+        }
+        // Add arcs for corners
+        for (offset, angle) in [
+            (size - cr2, 0.0),
+            (vec2(0.0, size.y - cr2), PI * 0.5),
+            (vec2(0.0, 0.0), PI),
+            (vec2(size.x - cr2, 0.0), PI * 1.5),
+        ] {
+            let offset = offset + corner_radius;
+            builder.spawn(MaterialMesh2dBundle {
+                mesh: mesh_handles.circle.clone(),
+                material: material_handle.clone(),
+                transform: Transform::from_translation(
+                    (offset + size * (-item_anchor_vec - 0.5)).extend(0.00000005),
+                )
+                .with_scale(Vec3::splat(corner_radius))
+                .with_rotation(Quat::from_rotation_z(angle)),
+                ..default()
+            });
+        }
+    }
 }

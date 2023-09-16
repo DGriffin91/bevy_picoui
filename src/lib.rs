@@ -8,6 +8,7 @@ use renderer::render;
 use std::f32::consts::FRAC_PI_2;
 
 pub mod arc_mesh;
+pub mod guard;
 pub mod pico;
 pub mod renderer;
 pub mod widgets;
