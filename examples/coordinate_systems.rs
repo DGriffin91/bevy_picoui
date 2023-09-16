@@ -18,7 +18,7 @@ use bevy_basic_camera::{CameraController, CameraControllerPlugin};
 use bevy_coordinate_systems::{CoordinateTransformationsPlugin, View};
 use bevy_picoui::{
     pico::{Pico, Pico2dCamera, PicoItem},
-    widgets::{button, drag_value, hr, DragValue},
+    widgets::{basic_drag_widget, button, hr},
     PicoPlugin,
 };
 
@@ -216,49 +216,24 @@ fn update(
         ..default()
     });
 
-    let mut tdrag =
-        |pico: &mut Pico, bg: Color, label: &str, value: f32, relative: bool| -> DragValue {
-            let scale = 0.01;
-            let lane = pico.add(PicoItem {
-                width: Val::Percent(100.0),
-                height: Val::Vh(4.0),
-                anchor: Anchor::TopLeft,
-                parent: Some(side_bar),
-                ..default()
-            });
-            let dv = {
-                let _guard = pico.hstack(Val::Percent(5.0), Val::Percent(1.0), lane);
-                pico.add(PicoItem {
-                    text: label.to_string(),
-                    width: Val::Percent(60.0),
-                    height: Val::Percent(100.0),
-                    anchor_text: Anchor::CenterLeft,
-                    anchor: Anchor::TopLeft,
-                    parent: Some(lane),
-                    ..default()
-                });
-                drag_value(
-                    pico,
-                    bg,
-                    Val::Percent(30.0),
-                    Val::Percent(10.0),
-                    scale,
-                    value,
-                    lane,
-                    Some(&mut char_input_events),
-                )
-            };
-            if relative {
-                // Show relative value while dragging drag
-                if let Some(state) = pico.get_state_mut(dv.drag_index) {
-                    if let Some(drag) = state.drag {
-                        pico.get_mut(dv.drag_index).text =
-                            format!("{:.2}", drag.total_delta().x * scale)
-                    }
-                }
-            }
-            dv
-        };
+    let mut tdrag = |pico: &mut Pico, bg: Color, label: &str, value: f32, relative: bool| -> f32 {
+        let parent = pico.add(PicoItem {
+            width: Val::Percent(100.0),
+            height: Val::Vh(4.0),
+            anchor: Anchor::TopLeft,
+            parent: Some(side_bar),
+            ..default()
+        });
+        basic_drag_widget(
+            pico,
+            parent,
+            label,
+            value,
+            bg,
+            &mut char_input_events,
+            relative,
+        )
+    };
 
     {
         let _guard = pico.vstack(Val::Vh(1.0), Val::Vh(0.5), side_bar);
@@ -274,28 +249,28 @@ fn update(
 
         hr(&mut pico, Val::Percent(95.0), Val::Vh(0.2), Some(side_bar));
 
-        let dv = tdrag(&mut pico, RED, "Local X", 0.0, true);
+        let value = tdrag(&mut pico, RED, "Local X", 0.0, true);
         let v = trans.right();
-        trans.translation += v * dv.value;
+        trans.translation += v * value;
 
-        let dv = tdrag(&mut pico, GREEN, "Local Y", 0.0, true);
+        let value = tdrag(&mut pico, GREEN, "Local Y", 0.0, true);
         let v = trans.forward();
-        trans.translation += v * dv.value;
+        trans.translation += v * value;
 
-        let dv = tdrag(&mut pico, BLUE, "Local Z", 0.0, true);
+        let value = tdrag(&mut pico, BLUE, "Local Z", 0.0, true);
         let v = trans.up();
-        trans.translation += v * dv.value;
+        trans.translation += v * value;
 
         hr(&mut pico, Val::Percent(95.0), Val::Vh(0.2), Some(side_bar));
 
-        let dv = tdrag(&mut pico, RED, "World X", trans.translation.x, false);
-        trans.translation.x = dv.value;
+        let value = tdrag(&mut pico, RED, "World X", trans.translation.x, false);
+        trans.translation.x = value;
 
-        let dv = tdrag(&mut pico, GREEN, "World Y", trans.translation.y, false);
-        trans.translation.y = dv.value;
+        let value = tdrag(&mut pico, GREEN, "World Y", trans.translation.y, false);
+        trans.translation.y = value;
 
-        let dv = tdrag(&mut pico, BLUE, "World Z", trans.translation.z, false);
-        trans.translation.z = dv.value;
+        let value = tdrag(&mut pico, BLUE, "World Z", trans.translation.z, false);
+        trans.translation.z = value;
 
         hr(&mut pico, Val::Percent(95.0), Val::Vh(0.2), Some(side_bar));
 

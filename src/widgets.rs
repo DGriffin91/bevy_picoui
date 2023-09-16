@@ -68,35 +68,16 @@ pub fn hr(pico: &mut Pico, width: Val, height: Val, parent: Option<ItemIndex>) -
 // Value drag example widget
 // -------------------------
 
-pub struct DragValue {
-    pub value: f32,
-    pub drag_index: ItemIndex,
-}
-
 #[allow(clippy::too_many_arguments)]
 pub fn drag_value(
     pico: &mut Pico,
-    drag_bg: Color,
-    drag_width: Val,
-    corner_radius: Val,
     scale: f32,
     value: f32,
-    parent: ItemIndex,
+    drag_index: ItemIndex,
     char_input_events: Option<&mut EventReader<ReceivedCharacter>>,
-) -> DragValue {
+) -> f32 {
     let mut value = value;
-    let mut drag_bg = drag_bg;
-
-    let drag_index = pico.add(PicoItem {
-        // TODO user or auto precision
-        text: format!("{:.2}", value),
-        width: drag_width,
-        height: Val::Percent(100.0),
-        corner_radius,
-        anchor: Anchor::TopLeft,
-        parent: Some(parent),
-        ..default()
-    });
+    let mut drag_bg = pico.get_mut(drag_index).background;
 
     let mut dragging = false;
     if let Some(state) = pico.get_state(drag_index) {
@@ -185,5 +166,53 @@ pub fn drag_value(
     } else {
         drag_bg
     };
-    DragValue { value, drag_index }
+    value
+}
+
+// ---------------------------------------------------------
+// Basic example drag widget with label in horizontal layout
+// ---------------------------------------------------------
+
+pub fn basic_drag_widget(
+    pico: &mut Pico,
+    parent: ItemIndex,
+    label: &str,
+    value: f32,
+    bg: Color,
+    char_input_events: &mut EventReader<ReceivedCharacter>,
+    relative: bool,
+) -> f32 {
+    let scale = 0.01;
+    let _guard = pico.hstack(Val::Percent(5.0), Val::Percent(1.0), parent);
+    // Label Text
+    pico.add(PicoItem {
+        text: label.to_string(),
+        width: Val::Percent(60.0),
+        height: Val::Percent(100.0),
+        anchor_text: Anchor::CenterLeft,
+        anchor: Anchor::TopLeft,
+        parent: Some(parent),
+        ..default()
+    });
+    // Drag box
+    let drag_index = pico.add(PicoItem {
+        text: format!("{:.2}", value),
+        width: Val::Percent(30.0),
+        height: Val::Percent(100.0),
+        corner_radius: Val::Percent(10.0),
+        anchor: Anchor::TopLeft,
+        parent: Some(parent),
+        background: bg,
+        ..default()
+    });
+    let value = drag_value(pico, scale, value, drag_index, Some(char_input_events));
+    if relative {
+        // Show relative value while dragging drag
+        if let Some(state) = pico.get_state_mut(drag_index) {
+            if let Some(drag) = state.drag {
+                pico.get_mut(drag_index).text = format!("{:.2}", drag.total_delta().x * scale)
+            }
+        }
+    }
+    value
 }
