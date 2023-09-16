@@ -99,6 +99,9 @@ fn arc_mesh(sides: usize, radius: f32, start_angle: f32, end_angle: f32) -> Mesh
     mesh
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct ItemIndex(pub usize);
+
 // Only supports one camera.
 #[derive(Component)]
 pub struct Pico2dCamera;
@@ -136,7 +139,7 @@ pub struct PicoItem {
     /// Impacted by position, size, anchor (after transform from parent is applied, if any)
     pub spatial_id: Option<u64>,
     /// If set, coordinates for position/size will be relative to parent.
-    pub parent: Option<usize>,
+    pub parent: Option<ItemIndex>,
     // Coordinates are uv space 0..1 over the whole window
     pub computed_bbox: Option<Vec4>,
 }
@@ -277,7 +280,7 @@ pub struct Pico {
 }
 
 impl Pico {
-    pub fn vstack(&mut self, start: Val, margin: Val, parent: usize) -> Guard {
+    pub fn vstack(&mut self, start: Val, margin: Val, parent: ItemIndex) -> Guard {
         let bbox = self.bbox(parent);
         let parent_size = (bbox.zw() - bbox.xy()).abs();
         let start = self.val_in_parent_y(start, parent_size) * parent_size.y;
@@ -290,7 +293,7 @@ impl Pico {
         self.stack_guard.push();
         self.stack_guard.clone()
     }
-    pub fn hstack(&mut self, start: Val, margin: Val, parent: usize) -> Guard {
+    pub fn hstack(&mut self, start: Val, margin: Val, parent: ItemIndex) -> Guard {
         let bbox = self.bbox(parent);
         let parent_size = (bbox.zw() - bbox.xy()).abs();
         let start = self.val_in_parent_x(start, parent_size) * parent_size.x;
@@ -303,7 +306,7 @@ impl Pico {
         self.stack_guard.push();
         self.stack_guard.clone()
     }
-    pub fn get_hovered(&self, index: usize) -> Option<&StateItem> {
+    pub fn get_hovered(&self, index: ItemIndex) -> Option<&StateItem> {
         if let Some(state_item) = self.get_state(index) {
             if state_item.hover {
                 return Some(state_item);
@@ -311,7 +314,7 @@ impl Pico {
         }
         None
     }
-    pub fn clicked(&self, index: usize) -> bool {
+    pub fn clicked(&self, index: ItemIndex) -> bool {
         if let Some(state_item) = self.get_hovered(index) {
             if let Some(input) = &state_item.input {
                 return input.just_pressed(MouseButton::Left);
@@ -319,7 +322,7 @@ impl Pico {
         }
         false
     }
-    pub fn released(&self, index: usize) -> bool {
+    pub fn released(&self, index: ItemIndex) -> bool {
         if let Some(state_item) = self.get_hovered(index) {
             if let Some(input) = &state_item.input {
                 return input.just_released(MouseButton::Left);
@@ -327,23 +330,17 @@ impl Pico {
         }
         false
     }
-    pub fn bbox(&self, index: usize) -> Vec4 {
+    pub fn bbox(&self, index: ItemIndex) -> Vec4 {
         let item = self.get(index);
         if let Some(computed_bbox) = item.computed_bbox {
             return computed_bbox;
         }
         vec4(0.0, 0.0, 1.0, 1.0)
     }
-    /// Take a uv for relative to the window (0.0, 0.0 at top left, 1.0, 1.0 bottom right)
-    /// And get the corresponding uv inside the given parent
-    pub fn window_uv_for_parent(&self, window_uv: Vec2, parent: [usize; 4]) -> Vec2 {
-        let bbox = self.bbox(parent[0]);
-        (window_uv - bbox.xy()) / (bbox.zw() - bbox.xy()).abs()
-    }
-    pub fn hovered(&self, index: usize) -> bool {
+    pub fn hovered(&self, index: ItemIndex) -> bool {
         self.get_hovered(index).is_some()
     }
-    pub fn add(&mut self, mut item: PicoItem) -> usize {
+    pub fn add(&mut self, mut item: PicoItem) -> ItemIndex {
         let parent_2d_bbox = if let Some(parent) = item.parent {
             if let Some(parent_depth) = self.get(parent).depth {
                 if let Some(depth) = &mut item.depth {
@@ -411,7 +408,7 @@ impl Pico {
             get_bbox(item.uv_size, item.uv_position, &item.anchor)
         });
         self.items.push(item);
-        self.items.len() - 1
+        ItemIndex(self.items.len() - 1)
     }
 
     // get scaled v of uv within parent
@@ -450,34 +447,31 @@ impl Pico {
         vy
     }
 
-    pub fn get_state_mut(&mut self, index: usize) -> Option<&mut StateItem> {
+    pub fn get_state_mut(&mut self, index: ItemIndex) -> Option<&mut StateItem> {
         self.state.get_mut(&self.get(index).spatial_id.unwrap())
     }
-    pub fn get_state(&self, index: usize) -> Option<&StateItem> {
+    pub fn get_state(&self, index: ItemIndex) -> Option<&StateItem> {
         self.state.get(&self.get(index).spatial_id.unwrap())
     }
-    pub fn get_mut(&mut self, index: usize) -> &mut PicoItem {
-        if index >= self.items.len() {
+    pub fn get_mut(&mut self, index: ItemIndex) -> &mut PicoItem {
+        if index.0 >= self.items.len() {
             panic!(
                 "Tried to access item {} but there are only {}",
-                index,
+                index.0,
                 self.items.len()
             );
         }
-        &mut self.items[index]
+        &mut self.items[index.0]
     }
-    pub fn get(&self, index: usize) -> &PicoItem {
-        if index >= self.items.len() {
+    pub fn get(&self, index: ItemIndex) -> &PicoItem {
+        if index.0 >= self.items.len() {
             panic!(
                 "Tried to access item {} but there are only {}",
-                index,
+                index.0,
                 self.items.len()
             );
         }
-        &self.items[index]
-    }
-    pub fn last(&self) -> usize {
-        (self.items.len() - 1).max(0)
+        &self.items[index.0]
     }
     pub fn storage(&mut self) -> Option<&mut Option<Box<dyn std::any::Any + Send + Sync>>> {
         if let Some(item) = self.items.last() {

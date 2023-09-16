@@ -88,7 +88,7 @@ fn update(mut gizmos: Gizmos, mut pico: ResMut<Pico>) {
     gizmos.ray(Vec3::ZERO, Vec3::Y * 1000.0, Color::GREEN);
 
     // Add 3d text
-    pico.add(PicoItem {
+    let axis_text_index = pico.add(PicoItem {
         position_3d: Some(Vec3::Y * 1.1),
         uv_size: vec2(0.02, 0.02),
         background: Color::rgba(0.1, 0.1, 0.1, 0.5),
@@ -96,7 +96,6 @@ fn update(mut gizmos: Gizmos, mut pico: ResMut<Pico>) {
         anchor: Anchor::TopLeft,
         ..default()
     });
-    let axis_text_index = pico.last();
     if pico.hovered(axis_text_index) {
         // Make axis text more opaque
         pico.get_mut(axis_text_index).background = Color::rgba(0.1, 0.1, 0.1, 0.8);
