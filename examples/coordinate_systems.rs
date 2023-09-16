@@ -16,7 +16,10 @@ use bevy::{
 
 use bevy_basic_camera::{CameraController, CameraControllerPlugin};
 use bevy_coordinate_systems::{CoordinateTransformationsPlugin, View};
-use bevy_picoui::{button, drag_value, hr, DragValue, Pico, Pico2dCamera, PicoItem, PicoPlugin};
+use bevy_picoui::{
+    widgets::{button, drag_value, hr, DragValue},
+    Pico, Pico2dCamera, PicoItem, PicoPlugin,
+};
 
 fn get_default_cam_trans() -> Transform {
     Transform::from_xyz(3.0, 2.5, 3.0).looking_at(Vec3::ZERO, Vec3::Y)
@@ -217,21 +220,37 @@ fn update(
     let mut tdrag =
         |pico: &mut Pico, bg: Color, label: &str, value: f32, relative: bool| -> DragValue {
             let scale = 0.01;
-            let dv = drag_value(
-                pico,
-                bg,
-                Val::Percent(5.0),
-                Val::Percent(1.0),
-                Val::Vh(4.0),
-                Val::Percent(60.0),
-                Val::Percent(30.0),
-                Val::Percent(10.0),
-                label,
-                scale,
-                value,
-                side_bar,
-                Some(&mut char_input_events),
-            );
+            let lane = pico
+                .add(PicoItem {
+                    width: Val::Percent(100.0),
+                    height: Val::Vh(4.0),
+                    anchor: Anchor::TopLeft,
+                    parent: Some(side_bar),
+                    ..default()
+                })
+                .last();
+            let dv = {
+                let _guard = pico.hstack(Val::Percent(5.0), Val::Percent(1.0), lane);
+                pico.add(PicoItem {
+                    text: label.to_string(),
+                    width: Val::Percent(60.0),
+                    height: Val::Percent(100.0),
+                    anchor_text: Anchor::CenterLeft,
+                    anchor: Anchor::TopLeft,
+                    parent: Some(lane),
+                    ..default()
+                });
+                drag_value(
+                    pico,
+                    bg,
+                    Val::Percent(30.0),
+                    Val::Percent(10.0),
+                    scale,
+                    value,
+                    lane,
+                    Some(&mut char_input_events),
+                )
+            };
             if relative {
                 // Show relative value while dragging drag
                 if let Some(state) = pico.get_state_mut(dv.drag_index) {
