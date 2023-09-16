@@ -204,31 +204,27 @@ fn update(
         return;
     };
 
-    let side_bar = pico
-        .add(PicoItem {
-            x: Val::Vh(0.0),
-            y: Val::Vh(0.0),
-            width: Val::Vh(20.0),
-            height: Val::Vh(100.0),
-            anchor: Anchor::TopLeft,
-            alignment: TextAlignment::Left,
-            background: Color::rgba(0.2, 0.2, 0.2, 0.2),
-            ..default()
-        })
-        .last();
+    let side_bar = pico.add(PicoItem {
+        x: Val::Vh(0.0),
+        y: Val::Vh(0.0),
+        width: Val::Vh(20.0),
+        height: Val::Vh(100.0),
+        anchor: Anchor::TopLeft,
+        alignment: TextAlignment::Left,
+        background: Color::rgba(0.2, 0.2, 0.2, 0.2),
+        ..default()
+    });
 
     let mut tdrag =
         |pico: &mut Pico, bg: Color, label: &str, value: f32, relative: bool| -> DragValue {
             let scale = 0.01;
-            let lane = pico
-                .add(PicoItem {
-                    width: Val::Percent(100.0),
-                    height: Val::Vh(4.0),
-                    anchor: Anchor::TopLeft,
-                    parent: Some(side_bar),
-                    ..default()
-                })
-                .last();
+            let lane = pico.add(PicoItem {
+                width: Val::Percent(100.0),
+                height: Val::Vh(4.0),
+                anchor: Anchor::TopLeft,
+                parent: Some(side_bar),
+                ..default()
+            });
             let dv = {
                 let _guard = pico.hstack(Val::Percent(5.0), Val::Percent(1.0), lane);
                 pico.add(PicoItem {
@@ -273,8 +269,7 @@ fn update(
             anchor: Anchor::TopCenter,
             parent: Some(side_bar),
             ..default()
-        })
-        .last();
+        });
 
         hr(&mut pico, Val::Percent(95.0), Val::Vh(0.2), Some(side_bar));
 

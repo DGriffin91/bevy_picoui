@@ -67,32 +67,28 @@ fn setup(
 }
 
 fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
-    let main_box = pico
-        .add(PicoItem {
-            y: Val::Vh(50.0),
-            x: Val::Vh(10.0),
-            width: Val::Vh(50.0),
-            height: Val::Vh(50.0),
-            anchor: Anchor::CenterLeft,
-            background: SLATE,
-            ..default()
-        })
-        .last();
+    let main_box = pico.add(PicoItem {
+        y: Val::Vh(50.0),
+        x: Val::Vh(10.0),
+        width: Val::Vh(50.0),
+        height: Val::Vh(50.0),
+        anchor: Anchor::CenterLeft,
+        background: SLATE,
+        ..default()
+    });
 
     {
         let _guard = pico.vstack(Val::Percent(0.5), Val::Percent(1.0), main_box);
 
         for row in &mut toggle_states {
-            let lane = pico
-                .add(PicoItem {
-                    width: Val::Percent(100.0),
-                    height: Val::Percent(9.0),
-                    background: CURRENT,
-                    anchor: Anchor::TopLeft,
-                    parent: Some(main_box),
-                    ..default()
-                })
-                .last();
+            let lane = pico.add(PicoItem {
+                width: Val::Percent(100.0),
+                height: Val::Percent(9.0),
+                background: CURRENT,
+                anchor: Anchor::TopLeft,
+                parent: Some(main_box),
+                ..default()
+            });
             {
                 let _guard = pico.hstack(Val::Percent(0.5), Val::Percent(1.0), lane);
                 for toggle_state in row {

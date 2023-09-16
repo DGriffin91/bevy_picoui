@@ -7,8 +7,7 @@ use crate::{Pico, PicoItem};
 // -------------------------
 
 pub fn button(pico: &mut Pico, item: PicoItem) -> usize {
-    let index = pico.items.len();
-    let pico = pico.add(item);
+    let index = pico.add(item);
     let c = pico.get(index).background;
     pico.get_mut(index).background = if pico.hovered(index) {
         c + Vec4::splat(0.06)
@@ -28,8 +27,7 @@ pub fn toggle_button(
     enabled_bg: Color,
     toggle_state: &mut bool,
 ) -> usize {
-    let index = pico.items.len();
-    let pico = pico.add(item);
+    let index = pico.add(item);
     let mut c = pico.get(index).background;
     if pico.clicked(index) {
         *toggle_state = !*toggle_state;

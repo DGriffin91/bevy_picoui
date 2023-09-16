@@ -343,7 +343,7 @@ impl Pico {
     pub fn hovered(&self, index: usize) -> bool {
         self.get_hovered(index).is_some()
     }
-    pub fn add(&mut self, mut item: PicoItem) -> &mut Self {
+    pub fn add(&mut self, mut item: PicoItem) -> usize {
         let parent_2d_bbox = if let Some(parent) = item.parent {
             if let Some(parent_depth) = self.get(parent).depth {
                 if let Some(depth) = &mut item.depth {
@@ -411,7 +411,7 @@ impl Pico {
             get_bbox(item.uv_size, item.uv_position, &item.anchor)
         });
         self.items.push(item);
-        self
+        self.items.len() - 1
     }
 
     // get scaled v of uv within parent

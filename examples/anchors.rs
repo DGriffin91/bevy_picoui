@@ -37,20 +37,18 @@ fn setup(mut commands: Commands) {
 }
 
 fn update(mut pico: ResMut<Pico>) {
-    let main_box = pico
-        .add(PicoItem {
-            depth: Some(0.01),
-            x: Val::Percent(0.0),
-            y: Val::Percent(0.0),
-            width: Val::VMin(50.0),
-            height: Val::VMin(50.0),
-            corner_radius: Val::Percent(4.0),
-            anchor: Anchor::Center,
-            anchor_parent: Anchor::Center,
-            background: SLATE,
-            ..default()
-        })
-        .last();
+    let main_box = pico.add(PicoItem {
+        depth: Some(0.01),
+        x: Val::Percent(0.0),
+        y: Val::Percent(0.0),
+        width: Val::VMin(50.0),
+        height: Val::VMin(50.0),
+        corner_radius: Val::Percent(4.0),
+        anchor: Anchor::Center,
+        anchor_parent: Anchor::Center,
+        background: SLATE,
+        ..default()
+    });
 
     for parent_anchor in [
         Anchor::Center,
