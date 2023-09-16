@@ -181,14 +181,17 @@ fn update(
     }
 
     // Example instructions
-    let right = pico.vh_right;
     pico.add(PicoItem {
-        position: vec2(right, 1.0),
         text: String::from(
             "Click and drag to orbit camera\nDolly with scroll wheel\nMove with WASD",
         ),
+        anchor_parent: Anchor::BottomRight,
         anchor: Anchor::BottomRight,
-        size: vec2(0.35, 0.1),
+        anchor_text: Anchor::BottomRight,
+        x: Val::Vh(1.0),
+        y: Val::Vh(1.0),
+        width: Val::Vh(30.0),
+        height: Val::Vh(10.0),
         alignment: TextAlignment::Right,
         background: Color::rgba(0.0, 0.0, 0.0, 0.3),
         ..default()
@@ -197,13 +200,14 @@ fn update(
     let Ok((view, mut trans)) = camera.get_single_mut() else {
         return;
     };
-    let vh = pico.vh;
 
     let side_bar = pico
         .add(PicoItem {
-            position: vec2(0.0, 0.0),
+            x: Val::Vh(0.0),
+            y: Val::Vh(0.0),
+            width: Val::Vh(20.0),
+            height: Val::Vh(100.0),
             anchor: Anchor::TopLeft,
-            size: vec2(0.2 * vh, 1.0),
             alignment: TextAlignment::Left,
             background: Color::rgba(0.2, 0.2, 0.2, 0.2),
             ..default()
@@ -216,14 +220,15 @@ fn update(
             let dv = drag_value(
                 pico,
                 bg,
-                vec2(0.05, 0.0),
-                0.025,
-                0.6,
-                0.3,
+                Val::Percent(5.0),
+                Val::Percent(1.0),
+                Val::Vh(4.0),
+                Val::Percent(68.0),
+                Val::Percent(22.0),
                 label,
                 scale,
                 value,
-                Some(side_bar),
+                side_bar,
                 Some(&mut char_input_events),
             );
             if relative {
@@ -239,18 +244,19 @@ fn update(
         };
 
     {
-        let _guard = pico.vstack(0.02, 0.01);
+        let _guard = pico.vstack(Val::Vh(1.0), Val::Vh(0.5), side_bar);
         pico.add(PicoItem {
-            position: vec2(0.02, 0.0),
-            size: vec2(1.0, 0.03),
+            x: Val::Percent(50.0),
+            width: Val::Percent(100.0),
+            height: Val::Vh(2.0),
             text: "Camera".into(),
-            anchor: Anchor::TopLeft,
+            anchor: Anchor::TopCenter,
             parent: Some(side_bar),
             ..default()
         })
         .last();
 
-        hr(&mut pico, vec2(0.95, 0.002), Some(side_bar));
+        hr(&mut pico, Val::Percent(95.0), Val::Vh(0.2), Some(side_bar));
 
         let dv = tdrag(&mut pico, RED, "Local X", 0.0, true);
         let v = trans.right();
@@ -264,7 +270,7 @@ fn update(
         let v = trans.up();
         trans.translation += v * dv.value;
 
-        hr(&mut pico, vec2(0.95, 0.002), Some(side_bar));
+        hr(&mut pico, Val::Percent(95.0), Val::Vh(0.2), Some(side_bar));
 
         let dv = tdrag(&mut pico, RED, "World X", trans.translation.x, false);
         trans.translation.x = dv.value;
@@ -275,13 +281,15 @@ fn update(
         let dv = tdrag(&mut pico, BLUE, "World Z", trans.translation.z, false);
         trans.translation.z = dv.value;
 
-        hr(&mut pico, vec2(0.95, 0.002), Some(side_bar));
+        hr(&mut pico, Val::Percent(95.0), Val::Vh(0.2), Some(side_bar));
 
         let btn = button(
             &mut pico,
             PicoItem {
-                position: vec2(0.05, 0.0),
-                size: vec2(0.9, 0.04),
+                x: Val::Percent(50.0),
+                width: Val::Percent(90.0),
+                height: Val::Vh(4.0),
+                anchor: Anchor::TopCenter,
                 background: DARK_GRAY,
                 text: "RESET CAMERA".to_string(),
                 parent: Some(side_bar),
@@ -289,7 +297,6 @@ fn update(
             },
         );
 
-        pico.get_mut(btn).anchor = Anchor::TopLeft;
         if pico.clicked(btn) {
             *trans = get_default_cam_trans();
         }
@@ -299,7 +306,8 @@ fn update(
     let axis_text = |p: Vec3, s: &str| -> PicoItem {
         PicoItem {
             position_3d: Some(p),
-            size: vec2(0.02 * vh, 0.02),
+            width: Val::Vh(2.0),
+            height: Val::Vh(2.0),
             background: Color::rgba(0.0, 0.0, 0.0, 0.3),
             text: s.to_string(),
             font_size: 0.02,

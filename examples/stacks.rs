@@ -67,25 +67,26 @@ fn setup(
 }
 
 fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
-    let vh = pico.vh;
     let main_box = pico
         .add(PicoItem {
-            position: vec2(0.1 * vh, 0.5),
+            y: Val::Vh(50.0),
+            x: Val::Vh(10.0),
+            width: Val::Vh(50.0),
+            height: Val::Vh(50.0),
             anchor: Anchor::CenterLeft,
-            size: vec2(0.5 * vh, 0.5),
             background: SLATE,
             ..default()
         })
         .last();
 
     {
-        let _guard = pico.vstack(0.01, 0.015);
+        let _guard = pico.vstack(Val::Percent(0.5), Val::Percent(1.0), main_box);
 
         for row in &mut toggle_states {
             let lane = pico
                 .add(PicoItem {
-                    position: vec2(0.0, 0.0),
-                    size: vec2(1.0, 0.08),
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(9.0),
                     background: CURRENT,
                     anchor: Anchor::TopLeft,
                     parent: Some(main_box),
@@ -93,15 +94,16 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
                 })
                 .last();
             {
-                let _guard = pico.hstack(0.0, 0.045);
+                let _guard = pico.hstack(Val::Percent(0.5), Val::Percent(1.0), lane);
                 for toggle_state in row {
                     toggle_button(
                         &mut pico,
                         PicoItem {
-                            position: vec2(0.0, 0.1),
-                            size: vec2(0.05, 0.8),
+                            y: Val::Percent(50.0),
+                            width: Val::Percent(9.0),
+                            height: Val::Percent(80.0),
                             background: OILVINE,
-                            anchor: Anchor::TopLeft,
+                            anchor: Anchor::CenterLeft,
                             parent: Some(lane),
                             ..default()
                         },

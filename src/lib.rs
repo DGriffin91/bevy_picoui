@@ -99,11 +99,12 @@ pub fn toggle_button(
 
 /// Width is relative to parent. Height-y parent is removed so height is only relative to screen height
 /// so HRs are of a consistent height for the same input height.
-pub fn hr(pico: &mut Pico, size: Vec2, parent: Option<usize>) -> usize {
+pub fn hr(pico: &mut Pico, width: Val, height: Val, parent: Option<usize>) -> usize {
     let index = pico.last();
     pico.add(PicoItem {
-        position: vec2(0.5, 0.0),
-        size,
+        uv_position: vec2(0.5, 0.0),
+        width,
+        height,
         background: Color::rgba(1.0, 1.0, 1.0, 0.04),
         anchor: Anchor::TopCenter,
         parent,
@@ -125,52 +126,55 @@ pub struct DragValue {
 pub fn drag_value(
     pico: &mut Pico,
     drag_bg: Color,
-    position: Vec2,
-    height: f32,
-    label_width: f32,
-    drag_width: f32,
+    start: Val,
+    margin: Val,
+    height: Val,
+    label_width: Val,
+    drag_width: Val,
     label: &str,
     scale: f32,
     value: f32,
-    parent: Option<usize>,
+    parent: usize,
     char_input_events: Option<&mut EventReader<ReceivedCharacter>>,
 ) -> DragValue {
     let mut value = value;
     let mut drag_bg = drag_bg;
-    let vstack_end = pico
-        .stack_stack
-        .last_mut()
-        .and_then(|stack| Some(stack.end))
-        .unwrap_or(0.0);
+
+    let lane = pico
+        .add(PicoItem {
+            width: Val::Percent(100.0),
+            height,
+            anchor: Anchor::TopLeft,
+            parent: Some(parent),
+            ..default()
+        })
+        .last();
+
     let text_index = pico.items.len();
-    let pico = pico.add(PicoItem {
-        text: label.to_string(),
-        position,
-        size: vec2(label_width, height),
-        anchor_text: Anchor::CenterLeft,
-        anchor: Anchor::TopLeft,
-        parent,
-        ..default()
-    });
+    let drag_index = text_index + 1;
+    {
+        let _guard = pico.hstack(start, margin, lane);
+        pico.add(PicoItem {
+            text: label.to_string(),
+            width: label_width,
+            height: Val::Percent(100.0),
+            anchor_text: Anchor::CenterLeft,
+            anchor: Anchor::TopLeft,
+            parent: Some(lane),
+            ..default()
+        });
 
-    let mut drag_item = PicoItem {
-        // TODO user or auto precision
-        text: format!("{:.2}", value),
-        position: position + Vec2::X * label_width,
-        size: vec2(drag_width, height),
-        parent,
-        ..default()
-    };
-
-    drag_item.anchor = Anchor::TopLeft;
-    let drag_index = pico.items.len();
-    // If were in a vstack, roll it back so we are on the same row
-    if let Some(stack) = pico.stack_stack.last_mut() {
-        if stack.vertical {
-            stack.end = vstack_end;
-        }
+        pico.add(PicoItem {
+            // TODO user or auto precision
+            text: format!("{:.2}", value),
+            width: drag_width,
+            height: Val::Percent(100.0),
+            anchor: Anchor::TopLeft,
+            parent: Some(lane),
+            ..default()
+        });
     }
-    let pico = pico.add(drag_item);
+
     let mut dragging = false;
     if let Some(state) = pico.get_state(drag_index) {
         if let Some(drag) = state.drag {
@@ -272,13 +276,16 @@ pub struct Pico2dCamera;
 #[derive(Component, Clone, Debug)]
 pub struct PicoItem {
     pub text: String,
-    /// Don't change after pico.add()
+    pub x: Val,
+    pub y: Val,
+    pub width: Val,
+    pub height: Val,
+    /// uv position within window, is combined with x, y at pico.add(). Don't change after pico.add()
+    pub uv_position: Vec2,
+    /// uv size within window, is combined with width, height at pico.add(). Don't change after pico.add()
+    pub uv_size: Vec2,
+    /// 3d world space position. Don't change after pico.add()
     pub position_3d: Option<Vec3>,
-    /// Don't change after pico.add()
-    pub position: Vec2,
-    /// 2d pixel coords. Text will center in size if it is not Vec2::INFINITY.
-    /// Don't change after pico.add()
-    pub size: Vec2,
     /// z position for 2d 1.0 is closer to camera 0.0 is further
     /// None for auto (calculated by order)
     pub depth: Option<f32>,
@@ -289,7 +296,7 @@ pub struct PicoItem {
     pub anchor: Anchor,
     pub anchor_text: Anchor,
     pub anchor_parent: Anchor,
-    /// A button must also have a non Vec2::INFINITY size.
+    /// A button must also have a non Vec2::ZERO size.
     pub button: bool,
     /// If life is 0.0, it will only live one frame (default), if life is f32::INFINITY it will live forever.
     pub life: f32,
@@ -307,10 +314,14 @@ pub struct PicoItem {
 impl Default for PicoItem {
     fn default() -> Self {
         PicoItem {
-            position: Vec2::ZERO,
+            x: Val::default(),
+            y: Val::default(),
+            width: Val::default(),
+            height: Val::default(),
+            uv_position: Vec2::ZERO,
             position_3d: None,
             depth: None,
-            size: Vec2::INFINITY,
+            uv_size: Vec2::ZERO,
             text: String::new(),
             font_size: 0.02,
             color: Color::WHITE,
@@ -332,7 +343,7 @@ impl Default for PicoItem {
 impl PicoItem {
     pub fn new2d(position: Vec2, text: &str) -> PicoItem {
         PicoItem {
-            position,
+            uv_position: position,
             text: text.to_string(),
             ..default()
         }
@@ -350,8 +361,8 @@ impl PicoItem {
     }
     fn generate_spatial_id(&self) -> u64 {
         let hasher = &mut DefaultHasher::new();
-        self.position.x.to_bits().hash(hasher);
-        self.position.y.to_bits().hash(hasher);
+        self.uv_position.x.to_bits().hash(hasher);
+        self.uv_position.y.to_bits().hash(hasher);
         if let Some(depth) = self.depth {
             depth.to_bits().hash(hasher);
         }
@@ -360,8 +371,8 @@ impl PicoItem {
             position_3d.y.to_bits().hash(hasher);
             position_3d.z.to_bits().hash(hasher);
         }
-        self.size.x.to_bits().hash(hasher);
-        self.size.y.to_bits().hash(hasher);
+        self.uv_size.x.to_bits().hash(hasher);
+        self.uv_size.y.to_bits().hash(hasher);
         format!("{:?}", self.anchor).hash(hasher);
         hasher.finish()
     }
@@ -414,6 +425,7 @@ impl Drop for Guard {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Stack {
     pub end: f32,
     pub margin: f32,
@@ -428,19 +440,16 @@ pub struct Pico {
     pub stack_stack: Vec<Stack>,
     pub stack_guard: Guard,
     pub window_size: Vec2,
-    /// The ratio of window height to window width.
-    /// For keeping items horizontally proportional.
-    /// 2d x coords are mapped so that when x is 1 it is the same distance in pixels as when y is 1
-    /// (For keeping things from stretching horizontally when scaling the window)
-    pub vh: f32,
-    /// The right edge of the window after scaling by vh
-    pub vh_right: f32,
     pub mouse_button_input: Option<Input<MouseButton>>,
     pub auto_depth: f32,
 }
 
 impl Pico {
-    pub fn vstack(&mut self, start: f32, margin: f32) -> Guard {
+    pub fn vstack(&mut self, start: Val, margin: Val, parent: usize) -> Guard {
+        let bbox = self.bbox(parent);
+        let parent_size = (bbox.zw() - bbox.xy()).abs();
+        let start = self.val_in_parent_y(start, parent_size) * parent_size.y;
+        let margin = self.val_in_parent_y(margin, parent_size) * parent_size.y;
         self.stack_stack.push(Stack {
             end: start,
             margin,
@@ -449,7 +458,11 @@ impl Pico {
         self.stack_guard.push();
         self.stack_guard.clone()
     }
-    pub fn hstack(&mut self, start: f32, margin: f32) -> Guard {
+    pub fn hstack(&mut self, start: Val, margin: Val, parent: usize) -> Guard {
+        let bbox = self.bbox(parent);
+        let parent_size = (bbox.zw() - bbox.xy()).abs();
+        let start = self.val_in_parent_x(start, parent_size) * parent_size.x;
+        let margin = self.val_in_parent_x(margin, parent_size) * parent_size.x;
         self.stack_stack.push(Stack {
             end: start,
             margin,
@@ -499,49 +512,57 @@ impl Pico {
         self.get_hovered(index).is_some()
     }
     pub fn add(&mut self, mut item: PicoItem) -> &mut Self {
+        let parent_2d_bbox = if let Some(parent) = item.parent {
+            if let Some(parent_depth) = self.get(parent).depth {
+                if let Some(depth) = &mut item.depth {
+                    *depth += parent_depth;
+                    if *depth == parent_depth {
+                        // Make sure child is in front of parent if they were at the same z
+                        *depth += 0.000001;
+                    }
+                } else {
+                    item.depth = Some(parent_depth + 0.000001);
+                }
+            }
+            self.bbox(parent)
+        } else {
+            vec4(0.0, 0.0, 1.0, 1.0)
+        };
+
+        if item.depth.is_none() {
+            self.auto_depth += 0.000001;
+            item.depth = Some(self.auto_depth);
+        }
+
+        let parent_size = (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
+
+        let vx = self.val_in_parent_x(item.x, parent_size);
+        let vy = self.val_in_parent_y(item.y, parent_size);
+        let vw = self.val_in_parent_x(item.width, parent_size);
+        let vh = self.val_in_parent_y(item.height, parent_size);
+
+        let pa_vec = item.anchor_parent.as_vec() * vec2(1.0, -1.0);
+        item.uv_position += vec2(vx, vy);
+        item.uv_position *= -pa_vec * 2.0;
+        item.uv_position += pa_vec + vec2(0.5, 0.5);
+        item.uv_position = lerp2(parent_2d_bbox.xy(), parent_2d_bbox.zw(), item.uv_position);
+        item.uv_size += vec2(vw, vh);
+        item.uv_size *= (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
+
         while (self.stack_guard.get() as usize) < self.stack_stack.len() {
             self.stack_stack.pop();
         }
         if !self.stack_stack.is_empty() {
             let stack = self.stack_stack.last_mut().unwrap();
             if stack.vertical {
-                item.position.y += stack.end + stack.margin;
-                stack.end = stack
-                    .end
-                    .max(get_bbox(item.size, item.position, &item.anchor).w);
+                item.uv_position.y += stack.end;
+                let bbox = get_bbox(item.uv_size, item.uv_position, &item.anchor);
+                stack.end = stack.end.max(bbox.w - parent_2d_bbox.y) + stack.margin;
             } else {
-                item.position.x += stack.end + stack.margin;
-                stack.end = stack
-                    .end
-                    .max(get_bbox(item.size, item.position, &item.anchor).z);
+                item.uv_position.x += stack.end;
+                let bbox = get_bbox(item.uv_size, item.uv_position, &item.anchor);
+                stack.end = stack.end.max(bbox.z - parent_2d_bbox.x) + stack.margin;
             }
-        }
-        {
-            let parent_2d_bbox = if let Some(parent) = item.parent {
-                if let Some(depth) = &mut item.depth {
-                    if let Some(parent_depth) = self.get(parent).depth {
-                        *depth += parent_depth;
-                        if *depth == parent_depth {
-                            // Make sure child is in front of parent if they were at the same z
-                            *depth += 0.000001;
-                        }
-                    }
-                }
-                self.bbox(parent)
-            } else {
-                vec4(0.0, 0.0, 1.0, 1.0)
-            };
-
-            if item.depth.is_none() {
-                self.auto_depth += 0.00001;
-                item.depth = Some(self.auto_depth);
-            }
-
-            let pa_vec = item.anchor_parent.as_vec() * vec2(1.0, -1.0);
-            item.position *= -pa_vec * 2.0;
-            item.position += pa_vec + vec2(0.5, 0.5);
-            item.position = lerp2(parent_2d_bbox.xy(), parent_2d_bbox.zw(), item.position);
-            item.size *= (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
         }
 
         if item.spatial_id.is_none() {
@@ -554,11 +575,48 @@ impl Pico {
                 Vec4::ZERO
             }
         } else {
-            get_bbox(item.size, item.position, &item.anchor)
+            get_bbox(item.uv_size, item.uv_position, &item.anchor)
         });
         self.items.push(item);
         self
     }
+
+    // get scaled v of uv within parent
+    fn val_in_parent_x(&self, x: Val, parent_size: Vec2) -> f32 {
+        let vx = match x {
+            Val::Auto => 0.0,
+            Val::Px(n) => n / self.window_size.x,
+            Val::Percent(n) => (n / 100.0) * parent_size.x,
+            Val::Vw(n) => n / 100.0,
+            Val::Vh(n) => (n / 100.0) * (self.window_size.y / self.window_size.x),
+            Val::VMin(n) => {
+                (n / 100.0) * (self.window_size.x.min(self.window_size.y) / self.window_size.x)
+            }
+            Val::VMax(n) => {
+                (n / 100.0) * (self.window_size.x.max(self.window_size.y) / self.window_size.x)
+            }
+        } / parent_size.x;
+        vx
+    }
+
+    // get scaled u of uv within parent
+    fn val_in_parent_y(&self, y: Val, parent_size: Vec2) -> f32 {
+        let vy = match y {
+            Val::Auto => 0.0,
+            Val::Px(n) => n / self.window_size.y,
+            Val::Percent(n) => (n / 100.0) * parent_size.y,
+            Val::Vw(n) => (n / 100.0) * (self.window_size.x / self.window_size.y),
+            Val::Vh(n) => n / 100.0,
+            Val::VMin(n) => {
+                (n / 100.0) * (self.window_size.x.min(self.window_size.y) / self.window_size.y)
+            }
+            Val::VMax(n) => {
+                (n / 100.0) * (self.window_size.x.max(self.window_size.y) / self.window_size.y)
+            }
+        } / parent_size.y;
+        vy
+    }
+
     pub fn get_state_mut(&mut self, index: usize) -> Option<&mut StateItem> {
         self.state.get_mut(&self.get(index).spatial_id.unwrap())
     }
@@ -692,14 +750,14 @@ fn render(
         let spatial_id = item.spatial_id.unwrap();
 
         let mut item_ndc =
-            ((item.position - Vec2::splat(0.5)) * vec2(2.0, -2.0)).extend(item.depth.unwrap());
+            ((item.uv_position - Vec2::splat(0.5)) * vec2(2.0, -2.0)).extend(item.depth.unwrap());
 
         if let Some(position_3d) = item.position_3d {
             item_ndc = camera
                 .world_to_ndc(camera_transform, position_3d)
                 .unwrap_or(Vec3::NAN);
             // include 2d offset
-            item_ndc += ((item.position) * vec2(2.0, -2.0)).extend(item.depth.unwrap());
+            item_ndc += ((item.uv_position) * vec2(2.0, -2.0)).extend(item.depth.unwrap());
         }
 
         let item_pos = item_ndc.xy() * window_size * 0.5;
@@ -790,8 +848,8 @@ fn render(
             };
             state_item.life = item.life;
             state_item.id = item.id.unwrap();
-            if item.size.x.is_finite() && item.size.y.is_finite() {
-                let size = item.size * window_size;
+            if item.uv_size.x > 0.0 || item.uv_size.y > 0.0 {
+                let size = item.uv_size * window_size;
                 let sprite = Sprite {
                     color: item.background,
                     custom_size: Some(size),
@@ -822,7 +880,7 @@ fn render(
                     })
                     .id();
                 state_item.bbox = get_bbox(
-                    item.size,
+                    item.uv_size,
                     trans.translation.xy() / window_size * vec2(1.0, -1.0) + 0.5,
                     &sprite.anchor,
                 );
@@ -861,8 +919,6 @@ fn render(
     pico.state.retain(|_, state_item| state_item.life >= 0.0);
     pico.interacting = interacting;
     pico.window_size = window_size;
-    pico.vh = window_size.y / window_size.x;
-    pico.vh_right = window_size.x / window_size.y;
     pico.mouse_button_input = Some(mouse_button_input.clone());
     pico.auto_depth = 0.5;
 }
