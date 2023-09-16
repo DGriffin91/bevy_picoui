@@ -1,15 +1,17 @@
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
     input::InputSystem,
-    math::{vec2, vec4, Vec3Swizzles, Vec4Swizzles},
+    math::{vec2, vec3, vec4, Vec3Swizzles, Vec4Swizzles},
     prelude::*,
-    sprite::Anchor,
+    render::{mesh::Indices, render_resource::PrimitiveTopology},
+    sprite::{Anchor, MaterialMesh2dBundle, Mesh2dHandle},
     text::{BreakLineOn, Text2dBounds},
 };
 use core::hash::Hash;
 use core::hash::Hasher;
 use std::{
     collections::hash_map::DefaultHasher,
+    f32::consts::{FRAC_PI_2, PI},
     sync::{
         atomic::{AtomicI32, Ordering},
         Arc,
@@ -26,18 +28,34 @@ pub struct PicoPlugin {
 #[derive(Resource)]
 pub struct CreateDefaultCamWithOrder(isize);
 
+#[derive(Resource)]
+pub struct MeshHandles {
+    circle: Mesh2dHandle,
+    rect: Mesh2dHandle,
+}
+
 impl Plugin for PicoPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Pico>()
-            .add_systems(PreUpdate, render.after(InputSystem));
+            .add_systems(PreUpdate, (render.after(InputSystem), apply_deferred));
         if let Some(n) = self.create_default_2d_cam_with_order {
             app.insert_resource(CreateDefaultCamWithOrder(n))
-                .add_systems(Startup, setup_default_cam);
+                .add_systems(Startup, setup);
         }
     }
 }
 
-fn setup_default_cam(mut commands: Commands, order: Res<CreateDefaultCamWithOrder>) {
+fn setup(
+    mut commands: Commands,
+    order: Res<CreateDefaultCamWithOrder>,
+    mut meshes: ResMut<Assets<Mesh>>,
+) {
+    let arc_mesh = arc_mesh(8, 1.0, 0.0, FRAC_PI_2);
+    let circle: Mesh2dHandle = meshes.add(arc_mesh).into();
+    let rect: Mesh2dHandle = meshes.add(shape::Quad::new(vec2(1.0, 1.0)).into()).into();
+
+    commands.insert_resource(MeshHandles { circle, rect });
+
     commands.spawn(Camera2dBundle {
         camera: Camera {
             order: order.0,
@@ -48,6 +66,35 @@ fn setup_default_cam(mut commands: Commands, order: Res<CreateDefaultCamWithOrde
         },
         ..default()
     });
+}
+
+fn arc_mesh(sides: usize, radius: f32, start_angle: f32, end_angle: f32) -> Mesh {
+    let mut positions = Vec::with_capacity(sides + 1);
+    let mut normals = Vec::with_capacity(sides + 1);
+    let mut uvs = Vec::with_capacity(sides + 1);
+
+    let step = (end_angle - start_angle) / sides as f32;
+
+    for i in 0..=sides {
+        let theta = start_angle + i as f32 * step;
+        let (sin, cos) = theta.sin_cos();
+
+        positions.push([cos * radius, sin * radius, 0.0]);
+        normals.push([0.0, 0.0, 1.0]);
+        uvs.push([0.5 * (cos + 1.0), 1.0 - 0.5 * (sin + 1.0)]);
+    }
+
+    let mut indices = Vec::with_capacity((sides - 1) * 3);
+    for i in 1..=(sides as u32) {
+        indices.extend_from_slice(&[0, i + 1, i]);
+    }
+
+    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    mesh.set_indices(Some(Indices::U32(indices)));
+    mesh
 }
 
 // -------------------------
@@ -131,6 +178,7 @@ pub fn drag_value(
     height: Val,
     label_width: Val,
     drag_width: Val,
+    corner_radius: Val,
     label: &str,
     scale: f32,
     value: f32,
@@ -169,6 +217,7 @@ pub fn drag_value(
             text: format!("{:.2}", value),
             width: drag_width,
             height: Val::Percent(100.0),
+            corner_radius,
             anchor: Anchor::TopLeft,
             parent: Some(lane),
             ..default()
@@ -257,7 +306,7 @@ pub fn drag_value(
             drag_bg += Vec4::splat(0.25);
         }
     }
-    pico.get_mut(drag_index).background = if pico.hovered(drag_index) {
+    pico.get_mut(drag_index).background = if pico.hovered(drag_index) || dragging {
         drag_bg + Vec4::splat(0.06)
     } else {
         drag_bg
@@ -273,7 +322,7 @@ pub fn drag_value(
 #[derive(Component)]
 pub struct Pico2dCamera;
 
-#[derive(Component, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct PicoItem {
     pub text: String,
     pub x: Val,
@@ -289,6 +338,8 @@ pub struct PicoItem {
     /// z position for 2d 1.0 is closer to camera 0.0 is further
     /// None for auto (calculated by order)
     pub depth: Option<f32>,
+    // 50% will result in a circle
+    pub corner_radius: Val,
     pub font_size: f32,
     pub color: Color,
     pub background: Color,
@@ -296,8 +347,6 @@ pub struct PicoItem {
     pub anchor: Anchor,
     pub anchor_text: Anchor,
     pub anchor_parent: Anchor,
-    /// A button must also have a non Vec2::ZERO size.
-    pub button: bool,
     /// If life is 0.0, it will only live one frame (default), if life is f32::INFINITY it will live forever.
     pub life: f32,
     /// If the id changes, the item is re-rendered
@@ -321,6 +370,7 @@ impl Default for PicoItem {
             uv_position: Vec2::ZERO,
             position_3d: None,
             depth: None,
+            corner_radius: Val::default(),
             uv_size: Vec2::ZERO,
             text: String::new(),
             font_size: 0.02,
@@ -330,7 +380,6 @@ impl Default for PicoItem {
             anchor_text: Anchor::Center,
             anchor: Anchor::Center,
             anchor_parent: Anchor::TopLeft,
-            button: false,
             life: 0.0,
             id: None,
             spatial_id: None,
@@ -363,6 +412,8 @@ impl PicoItem {
         let hasher = &mut DefaultHasher::new();
         self.uv_position.x.to_bits().hash(hasher);
         self.uv_position.y.to_bits().hash(hasher);
+        self.uv_size.x.to_bits().hash(hasher);
+        self.uv_size.y.to_bits().hash(hasher);
         if let Some(depth) = self.depth {
             depth.to_bits().hash(hasher);
         }
@@ -371,9 +422,9 @@ impl PicoItem {
             position_3d.y.to_bits().hash(hasher);
             position_3d.z.to_bits().hash(hasher);
         }
-        self.uv_size.x.to_bits().hash(hasher);
-        self.uv_size.y.to_bits().hash(hasher);
         format!("{:?}", self.anchor).hash(hasher);
+        format!("{:?}", self.anchor_parent).hash(hasher);
+        format!("{:?}", self.anchor_text).hash(hasher);
         hasher.finish()
     }
     fn generate_id(&mut self) -> u64 {
@@ -521,7 +572,8 @@ impl Pico {
                         *depth += 0.000001;
                     }
                 } else {
-                    item.depth = Some(parent_depth + 0.000001);
+                    self.auto_depth += 0.000001;
+                    item.depth = Some((parent_depth + 0.000001).max(self.auto_depth));
                 }
             }
             self.bbox(parent)
@@ -688,17 +740,22 @@ pub struct StateItem {
 }
 
 #[derive(Component)]
-pub struct PicoEntity(u64);
+pub struct PicoEntity {
+    spatial_id: u64,
+    anchor: Anchor,
+    size: Vec2,
+}
 
 #[allow(clippy::too_many_arguments)]
 fn render(
     mut commands: Commands,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    mesh_handles: Res<MeshHandles>,
     time: Res<Time>,
-    item_entities: Query<(Entity, &PicoItem)>,
     camera: Query<(&Camera, &GlobalTransform), With<Pico2dCamera>>,
     windows: Query<&Window>,
     mut pico: ResMut<Pico>,
-    mut pico_entites: Query<(Entity, &mut Transform, Option<&Sprite>, &PicoEntity)>,
+    mut pico_entites: Query<(Entity, &mut Transform, &PicoEntity)>,
     mouse_button_input: Res<Input<MouseButton>>,
     mut currently_dragging: Local<bool>,
 ) {
@@ -729,24 +786,21 @@ fn render(
 
     let mut items = std::mem::take(&mut pico.items);
 
-    // Move PicoItem entites to local set
-    for (imtext_entity, item) in &item_entities {
-        items.push(item.clone());
-        commands.entity(imtext_entity).despawn();
-    }
-
     // Sort so we interact in z order.
     items.sort_by(|a, b| b.depth.unwrap().partial_cmp(&a.depth.unwrap()).unwrap());
 
-    let mut first_interact_found = false;
+    let mut item_positions = Vec::new();
 
+    let mut first_interact_found = false;
     for item in &mut items {
         if item.id.is_none() {
             item.id = Some(item.generate_id());
         }
+
         if item.spatial_id.is_none() {
             item.spatial_id = Some(item.generate_spatial_id());
         }
+
         let spatial_id = item.spatial_id.unwrap();
 
         let mut item_ndc =
@@ -761,11 +815,12 @@ fn render(
         }
 
         let item_pos = item_ndc.xy() * window_size * 0.5;
+        item_positions.push(item_pos);
 
-        let generate = if let Some(existing_state_item) = pico.state.get_mut(&spatial_id) {
+        if let Some(existing_state_item) = pico.state.get_mut(&spatial_id) {
             // If a item in the state matches one created this frame keep it around
             existing_state_item.life = existing_state_item.life.max(0.0);
-            let Ok((_, mut trans, sprite, _)) =
+            let Ok((_, mut trans, pico_entity)) =
                 pico_entites.get_mut(existing_state_item.entity.unwrap())
             else {
                 continue;
@@ -776,54 +831,62 @@ fn render(
                 continue;
             }
 
-            if let Some(sprite) = sprite {
-                if let Some(custom_size) = sprite.custom_size {
-                    if let Some(cursor_pos) = window.cursor_position() {
-                        if mouse_button_input.pressed(MouseButton::Left) && !first_interact_found {
-                            if let Some(drag) = &mut existing_state_item.drag {
-                                drag.last_frame = drag.end;
-                                drag.end = cursor_pos;
-                            }
+            if let Some(cursor_pos) = window.cursor_position() {
+                if mouse_button_input.pressed(MouseButton::Left) && !first_interact_found {
+                    if let Some(drag) = &mut existing_state_item.drag {
+                        drag.last_frame = drag.end;
+                        drag.end = cursor_pos;
+                    }
+                }
+                existing_state_item.bbox = get_bbox(
+                    pico_entity.size / window_size,
+                    trans.translation.xy() / window_size * vec2(1.0, -1.0) + 0.5,
+                    &pico_entity.anchor,
+                );
+                let xy = existing_state_item.bbox.xy() * window_size;
+                let zw = existing_state_item.bbox.zw() * window_size;
+                if cursor_pos.cmpge(xy).all() && cursor_pos.cmple(zw).all() {
+                    existing_state_item.hover = true;
+                    if !first_interact_found {
+                        existing_state_item.input = Some(mouse_button_input.clone());
+                        if mouse_button_input.any_just_pressed([
+                            MouseButton::Left,
+                            MouseButton::Right,
+                            MouseButton::Middle,
+                        ]) {
+                            interacting = true;
+                            first_interact_found = true;
                         }
-                        existing_state_item.bbox = get_bbox(
-                            custom_size / window_size,
-                            trans.translation.xy() / window_size * vec2(1.0, -1.0) + 0.5,
-                            &sprite.anchor,
-                        );
-                        let xy = existing_state_item.bbox.xy() * window_size;
-                        let zw = existing_state_item.bbox.zw() * window_size;
-                        if cursor_pos.cmpge(xy).all() && cursor_pos.cmple(zw).all() {
-                            existing_state_item.hover = true;
-                            if !first_interact_found {
-                                existing_state_item.input = Some(mouse_button_input.clone());
-                                if mouse_button_input.any_just_pressed([
-                                    MouseButton::Left,
-                                    MouseButton::Right,
-                                    MouseButton::Middle,
-                                ]) {
-                                    interacting = true;
-                                    first_interact_found = true;
-                                }
-                                if mouse_button_input.just_pressed(MouseButton::Left)
-                                    && !*currently_dragging
-                                    && existing_state_item.drag.is_none()
-                                {
-                                    existing_state_item.drag = Some(Drag {
-                                        start: cursor_pos,
-                                        end: cursor_pos,
-                                        last_frame: cursor_pos,
-                                    });
-                                }
-                            }
+                        if mouse_button_input.just_pressed(MouseButton::Left)
+                            && !*currently_dragging
+                            && existing_state_item.drag.is_none()
+                        {
+                            existing_state_item.drag = Some(Drag {
+                                start: cursor_pos,
+                                end: cursor_pos,
+                                last_frame: cursor_pos,
+                            });
                         }
                     }
                 }
             }
+        }
+    }
+    let mut cached_materials: HashMap<u64, Handle<ColorMaterial>> = HashMap::new();
+
+    // It seems that we need to add things in z order for them to show up in that order initially
+    for (item, item_pos) in items.iter_mut().zip(item_positions.iter()) {
+        let spatial_id = item.spatial_id.unwrap();
+
+        let generate = if let Some(existing_state_item) = pico.state.get_mut(&spatial_id) {
             existing_state_item.id != item.id.unwrap()
         } else {
             true
         };
         if generate || pico.window_size != window_size {
+            let corner_radius = pico.val_in_parent_y(item.corner_radius, item.uv_size)
+                * item.uv_size.y
+                * window_size.y;
             let state_item = if let Some(old_state_item) = pico.state.get_mut(&spatial_id) {
                 let entity = old_state_item.entity.unwrap();
                 if pico_entites.get(entity).is_ok() {
@@ -850,42 +913,113 @@ fn render(
             state_item.id = item.id.unwrap();
             if item.uv_size.x > 0.0 || item.uv_size.y > 0.0 {
                 let size = item.uv_size * window_size;
-                let sprite = Sprite {
-                    color: item.background,
-                    custom_size: Some(size),
-                    anchor: item.anchor.clone(),
-                    ..default()
-                };
                 let trans = Transform::from_translation(item_pos.extend(1.0));
-                let entity = commands
-                    .spawn((
-                        SpriteBundle {
-                            sprite: sprite.clone(),
-                            transform: trans,
-                            ..default()
-                        },
-                        PicoEntity(spatial_id),
-                    ))
-                    .with_children(|builder| {
-                        builder.spawn(Text2dBundle {
-                            text,
-                            text_anchor: item.anchor_text.clone(),
-                            transform: Transform::from_translation(
-                                (size * -(item.anchor.as_vec() - item.anchor_text.as_vec()))
-                                    .extend(0.001),
-                            ),
-                            text_2d_bounds: Text2dBounds { size },
-                            ..default()
-                        });
-                    })
-                    .id();
+                let mut entity = commands.spawn(PicoEntity {
+                    spatial_id,
+                    anchor: item.anchor.clone(),
+                    size,
+                });
+
+                entity.insert(SpatialBundle {
+                    transform: trans,
+                    ..default()
+                });
+
+                let hasher = &mut DefaultHasher::new();
+                item.background.r().to_bits().hash(hasher);
+                item.background.g().to_bits().hash(hasher);
+                item.background.b().to_bits().hash(hasher);
+                item.background.a().to_bits().hash(hasher);
+                let mat_hash = hasher.finish();
+
+                let material_handle = if let Some(handle) = cached_materials.get(&mat_hash) {
+                    handle.clone()
+                } else {
+                    let handle = materials.add(ColorMaterial::from(item.background));
+                    cached_materials.insert(mat_hash, handle.clone());
+                    handle
+                };
+
+                //let material_handle = materials.add(ColorMaterial::from(item.background));
+
+                entity.with_children(|builder| {
+                    let item_anchor_vec = item.anchor.as_vec();
+                    let cr2 = corner_radius * 2.0;
+                    if item.background.a() > 0.0 {
+                        let anchor_trans = (-item_anchor_vec * size).extend(0.0);
+                        if corner_radius <= 0.0 {
+                            builder.spawn(MaterialMesh2dBundle {
+                                mesh: mesh_handles.rect.clone(),
+                                material: material_handle.clone(),
+                                transform: Transform::from_translation(anchor_trans)
+                                    .with_scale(size.extend(1.0)),
+                                ..default()
+                            });
+                        } else {
+                            // Make cross shape with gaps for the arcs
+                            builder.spawn(MaterialMesh2dBundle {
+                                mesh: mesh_handles.rect.clone(),
+                                material: material_handle.clone(),
+                                transform: Transform::from_translation(anchor_trans)
+                                    .with_scale((size - vec2(cr2, 0.0)).extend(1.0)),
+                                ..default()
+                            });
+                            let s = vec2(corner_radius, size.y - cr2).extend(1.0);
+                            let off = vec3((size.x - corner_radius) * 0.5, 0.0, 0.0);
+                            builder.spawn(MaterialMesh2dBundle {
+                                mesh: mesh_handles.rect.clone(),
+                                material: material_handle.clone(),
+                                transform: Transform::from_translation(anchor_trans + off)
+                                    .with_scale(s),
+                                ..default()
+                            });
+                            builder.spawn(MaterialMesh2dBundle {
+                                mesh: mesh_handles.rect.clone(),
+                                material: material_handle.clone(),
+                                transform: Transform::from_translation(anchor_trans - off)
+                                    .with_scale(s),
+                                ..default()
+                            });
+                            // Add arcs for corners
+                            for (offset, angle) in [
+                                (size - cr2, 0.0),
+                                (vec2(0.0, size.y - cr2), PI * 0.5),
+                                (vec2(0.0, 0.0), PI),
+                                (vec2(size.x - cr2, 0.0), PI * 1.5),
+                            ] {
+                                let offset = offset + corner_radius;
+                                builder.spawn(MaterialMesh2dBundle {
+                                    mesh: mesh_handles.circle.clone(),
+                                    material: material_handle.clone(),
+                                    transform: Transform::from_translation(
+                                        (offset + size * (-item_anchor_vec - 0.5))
+                                            .extend(0.00000005),
+                                    )
+                                    .with_scale(Vec3::splat(corner_radius))
+                                    .with_rotation(Quat::from_rotation_z(angle)),
+                                    ..default()
+                                });
+                            }
+                        }
+                    }
+
+                    builder.spawn(Text2dBundle {
+                        text,
+                        text_anchor: item.anchor_text.clone(),
+                        transform: Transform::from_translation(
+                            (size * -(item_anchor_vec - item.anchor_text.as_vec())).extend(0.0001),
+                        ),
+                        text_2d_bounds: Text2dBounds { size },
+                        ..default()
+                    });
+                });
                 state_item.bbox = get_bbox(
                     item.uv_size,
                     trans.translation.xy() / window_size * vec2(1.0, -1.0) + 0.5,
-                    &sprite.anchor,
+                    &item.anchor,
                 );
                 state_item.interactable = true;
-                state_item.entity = Some(entity);
+                state_item.entity = Some(entity.id());
             } else {
                 let entity = commands
                     .spawn(Text2dBundle {
@@ -908,9 +1042,9 @@ fn render(
         }
     }
 
-    for (entity, _, _, pico_entity) in &pico_entites {
+    for (entity, _, pico_entity) in &pico_entites {
         // Remove any orphaned
-        if pico.state.get(&pico_entity.0).is_none() {
+        if pico.state.get(&pico_entity.spatial_id).is_none() {
             commands.entity(entity).despawn_recursive();
         }
     }

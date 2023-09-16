@@ -39,16 +39,19 @@ fn setup(mut commands: Commands) {
 fn update(mut pico: ResMut<Pico>) {
     let main_box = pico
         .add(PicoItem {
+            depth: Some(0.01),
             x: Val::Percent(0.0),
             y: Val::Percent(0.0),
             width: Val::VMin(50.0),
             height: Val::VMin(50.0),
+            corner_radius: Val::Percent(4.0),
             anchor: Anchor::Center,
             anchor_parent: Anchor::Center,
             background: SLATE,
             ..default()
         })
         .last();
+
     for parent_anchor in [
         Anchor::Center,
         Anchor::BottomLeft,
@@ -61,26 +64,28 @@ fn update(mut pico: ResMut<Pico>) {
         Anchor::TopRight,
     ] {
         pico.add(PicoItem {
+            depth: Some(0.5),
             x: Val::Px(8.0),
             y: Val::Px(8.0),
             width: Val::Px(48.0),
             height: Val::Px(48.0),
+            corner_radius: Val::Px(4.0),
             anchor: parent_anchor.clone(),
             anchor_parent: parent_anchor.clone(),
             background: BURNT_RED,
             parent: Some(main_box),
             ..default()
-        })
-        .last();
+        });
         pico.add(PicoItem {
+            depth: Some(0.9),
             width: Val::Px(16.0),
             height: Val::Px(16.0),
-            anchor_parent: parent_anchor,
+            corner_radius: Val::Px(4.0),
+            anchor_parent: parent_anchor.clone(),
             background: CURRENT,
             parent: Some(main_box),
             ..default()
-        })
-        .last();
+        });
     }
 }
 
