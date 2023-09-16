@@ -1,6 +1,9 @@
 use bevy::{math::vec2, prelude::*, sprite::Anchor};
 
-use crate::{ItemIndex, Pico, PicoItem};
+use crate::{
+    pico::{ItemIndex, PicoItem},
+    Pico,
+};
 
 // -------------------------
 // Button example widget

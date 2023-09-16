@@ -2,7 +2,10 @@ use bevy::{math::*, prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use bevy_basic_camera::{CameraController, CameraControllerPlugin};
 use bevy_coordinate_systems::CoordinateTransformationsPlugin;
-use bevy_picoui::{Pico, Pico2dCamera, PicoItem, PicoPlugin};
+use bevy_picoui::{
+    pico::{Pico, Pico2dCamera, PicoItem},
+    PicoPlugin,
+};
 
 fn main() {
     App::new()

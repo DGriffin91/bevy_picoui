@@ -2,7 +2,11 @@ use std::time::Duration;
 
 use bevy::{asset::ChangeWatcher, math::*, prelude::*, render::view::RenderLayers, sprite::Anchor};
 
-use bevy_picoui::{widgets::toggle_button, Pico, Pico2dCamera, PicoItem, PicoPlugin};
+use bevy_picoui::{
+    pico::{Pico, Pico2dCamera, PicoItem},
+    widgets::toggle_button,
+    PicoPlugin,
+};
 
 fn main() {
     App::new()

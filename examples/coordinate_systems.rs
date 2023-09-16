@@ -17,8 +17,9 @@ use bevy::{
 use bevy_basic_camera::{CameraController, CameraControllerPlugin};
 use bevy_coordinate_systems::{CoordinateTransformationsPlugin, View};
 use bevy_picoui::{
+    pico::{Pico, Pico2dCamera, PicoItem},
     widgets::{button, drag_value, hr, DragValue},
-    Pico, Pico2dCamera, PicoItem, PicoPlugin,
+    PicoPlugin,
 };
 
 fn get_default_cam_trans() -> Transform {
