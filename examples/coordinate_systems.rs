@@ -187,7 +187,7 @@ fn update(
         text: String::from(
             "Click and drag to orbit camera\nDolly with scroll wheel\nMove with WASD",
         ),
-        rect_anchor: Anchor::BottomRight,
+        anchor: Anchor::BottomRight,
         size: vec2(0.35, 0.1),
         alignment: TextAlignment::Right,
         background: Color::rgba(0.0, 0.0, 0.0, 0.3),
@@ -202,7 +202,7 @@ fn update(
     let side_bar = pico
         .add(PicoItem {
             position: vec2(0.0, 0.0),
-            rect_anchor: Anchor::TopLeft,
+            anchor: Anchor::TopLeft,
             size: vec2(0.2 * vh, 1.0),
             alignment: TextAlignment::Left,
             background: Color::rgba(0.2, 0.2, 0.2, 0.2),
@@ -244,7 +244,7 @@ fn update(
             position: vec2(0.02, 0.0),
             size: vec2(1.0, 0.03),
             text: "Camera".into(),
-            rect_anchor: Anchor::TopLeft,
+            anchor: Anchor::TopLeft,
             parent: Some(side_bar),
             ..default()
         })
@@ -289,7 +289,7 @@ fn update(
             },
         );
 
-        pico.get_mut(btn).rect_anchor = Anchor::TopLeft;
+        pico.get_mut(btn).anchor = Anchor::TopLeft;
         if pico.clicked(btn) {
             *trans = get_default_cam_trans();
         }

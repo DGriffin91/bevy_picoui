@@ -71,7 +71,7 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
     let main_box = pico
         .add(PicoItem {
             position: vec2(0.1 * vh, 0.5),
-            rect_anchor: Anchor::CenterLeft,
+            anchor: Anchor::CenterLeft,
             size: vec2(0.5 * vh, 0.5),
             background: SLATE,
             ..default()
@@ -87,7 +87,7 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
                     position: vec2(0.0, 0.0),
                     size: vec2(1.0, 0.08),
                     background: CURRENT,
-                    rect_anchor: Anchor::TopLeft,
+                    anchor: Anchor::TopLeft,
                     parent: Some(main_box),
                     ..default()
                 })
@@ -101,7 +101,7 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
                             position: vec2(0.0, 0.1),
                             size: vec2(0.05, 0.8),
                             background: OILVINE,
-                            rect_anchor: Anchor::TopLeft,
+                            anchor: Anchor::TopLeft,
                             parent: Some(lane),
                             ..default()
                         },

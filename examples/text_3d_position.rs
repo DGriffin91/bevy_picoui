@@ -80,7 +80,7 @@ fn update(mut gizmos: Gizmos, mut pico: ResMut<Pico>) {
     pico.add(PicoItem {
         position: vec2(0.02, 0.02),
         text: String::from("Click and drag to orbit camera\nDolly with scroll wheel\nMove with WASD\n\nHover over the Y axis text"),
-        anchor: Anchor::TopLeft,
+        anchor_text: Anchor::TopLeft,
         ..default()
     });
 
@@ -93,7 +93,7 @@ fn update(mut gizmos: Gizmos, mut pico: ResMut<Pico>) {
         size: vec2(0.02, 0.02),
         background: Color::rgba(0.1, 0.1, 0.1, 0.5),
         text: String::from("Y+"),
-        rect_anchor: Anchor::TopLeft,
+        anchor: Anchor::TopLeft,
         ..default()
     });
     let axis_text_index = pico.last();
@@ -111,7 +111,7 @@ fn update(mut gizmos: Gizmos, mut pico: ResMut<Pico>) {
             size: vec2(0.1, 0.02),
             background: Color::rgba(0.1, 0.1, 0.1, 0.8),
             text: String::from("HELLO WORLD"),
-            rect_anchor: Anchor::TopLeft,
+            anchor: Anchor::TopLeft,
             ..default()
         });
     }

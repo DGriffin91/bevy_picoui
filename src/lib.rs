@@ -105,7 +105,7 @@ pub fn hr(pico: &mut Pico, size: Vec2, parent: Option<usize>) -> usize {
         position: vec2(0.5, 0.0),
         size,
         background: Color::rgba(1.0, 1.0, 1.0, 0.04),
-        rect_anchor: Anchor::TopCenter,
+        anchor: Anchor::TopCenter,
         parent,
         ..default()
     });
@@ -147,8 +147,8 @@ pub fn drag_value(
         text: label.to_string(),
         position,
         size: vec2(label_width, height),
-        anchor: Anchor::CenterLeft,
-        rect_anchor: Anchor::TopLeft,
+        anchor_text: Anchor::CenterLeft,
+        anchor: Anchor::TopLeft,
         parent,
         ..default()
     });
@@ -162,7 +162,7 @@ pub fn drag_value(
         ..default()
     };
 
-    drag_item.rect_anchor = Anchor::TopLeft;
+    drag_item.anchor = Anchor::TopLeft;
     let drag_index = pico.items.len();
     // If were in a vstack, roll it back so we are on the same row
     if let Some(stack) = pico.stack_stack.last_mut() {
@@ -276,7 +276,7 @@ pub struct PicoItem {
     pub position_3d: Option<Vec3>,
     /// Don't change after pico.add()
     pub position: Vec2,
-    /// 2d pixel coords. Text will center in rect if it is not Vec2::INFINITY.
+    /// 2d pixel coords. Text will center in size if it is not Vec2::INFINITY.
     /// Don't change after pico.add()
     pub size: Vec2,
     /// z position for 2d 1.0 is closer to camera 0.0 is further
@@ -287,18 +287,18 @@ pub struct PicoItem {
     pub background: Color,
     pub alignment: TextAlignment,
     pub anchor: Anchor,
-    pub rect_anchor: Anchor,
-    pub parent_anchor: Anchor,
-    /// A button must also have a non Vec2::INFINITY rect.
+    pub anchor_text: Anchor,
+    pub anchor_parent: Anchor,
+    /// A button must also have a non Vec2::INFINITY size.
     pub button: bool,
     /// If life is 0.0, it will only live one frame (default), if life is f32::INFINITY it will live forever.
     pub life: f32,
     /// If the id changes, the item is re-rendered
     pub id: Option<u64>,
     /// If the spatial_id changes a new state is used
-    /// Impacted by position, rect, rect_anchor (after transform from parent is applied, if any)
+    /// Impacted by position, size, anchor (after transform from parent is applied, if any)
     pub spatial_id: Option<u64>,
-    /// If set, coordinates for position/rect will be relative to parent.
+    /// If set, coordinates for position/size will be relative to parent.
     pub parent: Option<usize>,
     // Coordinates are uv space 0..1 over the whole window
     pub computed_bbox: Option<Vec4>,
@@ -316,9 +316,9 @@ impl Default for PicoItem {
             color: Color::WHITE,
             background: Color::NONE,
             alignment: TextAlignment::Center,
+            anchor_text: Anchor::Center,
             anchor: Anchor::Center,
-            rect_anchor: Anchor::Center,
-            parent_anchor: Anchor::TopLeft,
+            anchor_parent: Anchor::TopLeft,
             button: false,
             life: 0.0,
             id: None,
@@ -362,7 +362,7 @@ impl PicoItem {
         }
         self.size.x.to_bits().hash(hasher);
         self.size.y.to_bits().hash(hasher);
-        format!("{:?}", self.rect_anchor).hash(hasher);
+        format!("{:?}", self.anchor).hash(hasher);
         hasher.finish()
     }
     fn generate_id(&mut self) -> u64 {
@@ -508,12 +508,12 @@ impl Pico {
                 item.position.y += stack.end + stack.margin;
                 stack.end = stack
                     .end
-                    .max(get_bbox(item.size, item.position, &item.rect_anchor).w);
+                    .max(get_bbox(item.size, item.position, &item.anchor).w);
             } else {
                 item.position.x += stack.end + stack.margin;
                 stack.end = stack
                     .end
-                    .max(get_bbox(item.size, item.position, &item.rect_anchor).z);
+                    .max(get_bbox(item.size, item.position, &item.anchor).z);
             }
         }
         {
@@ -537,7 +537,7 @@ impl Pico {
                 item.depth = Some(self.auto_depth);
             }
 
-            let pa_vec = item.parent_anchor.as_vec() * vec2(1.0, -1.0);
+            let pa_vec = item.anchor_parent.as_vec() * vec2(1.0, -1.0);
             item.position *= -pa_vec * 2.0;
             item.position += pa_vec + vec2(0.5, 0.5);
             item.position = lerp2(parent_2d_bbox.xy(), parent_2d_bbox.zw(), item.position);
@@ -554,7 +554,7 @@ impl Pico {
                 Vec4::ZERO
             }
         } else {
-            get_bbox(item.size, item.position, &item.rect_anchor)
+            get_bbox(item.size, item.position, &item.anchor)
         });
         self.items.push(item);
         self
@@ -791,11 +791,11 @@ fn render(
             state_item.life = item.life;
             state_item.id = item.id.unwrap();
             if item.size.x.is_finite() && item.size.y.is_finite() {
-                let rect = item.size * window_size;
+                let size = item.size * window_size;
                 let sprite = Sprite {
                     color: item.background,
-                    custom_size: Some(rect),
-                    anchor: item.rect_anchor.clone(),
+                    custom_size: Some(size),
+                    anchor: item.anchor.clone(),
                     ..default()
                 };
                 let trans = Transform::from_translation(item_pos.extend(1.0));
@@ -811,12 +811,12 @@ fn render(
                     .with_children(|builder| {
                         builder.spawn(Text2dBundle {
                             text,
-                            text_anchor: item.anchor.clone(),
+                            text_anchor: item.anchor_text.clone(),
                             transform: Transform::from_translation(
-                                (rect * -(item.rect_anchor.as_vec() - item.anchor.as_vec()))
+                                (size * -(item.anchor.as_vec() - item.anchor_text.as_vec()))
                                     .extend(0.001),
                             ),
-                            text_2d_bounds: Text2dBounds { size: rect },
+                            text_2d_bounds: Text2dBounds { size },
                             ..default()
                         });
                     })
@@ -832,7 +832,7 @@ fn render(
                 let entity = commands
                     .spawn(Text2dBundle {
                         text,
-                        text_anchor: item.anchor.clone(),
+                        text_anchor: item.anchor_text.clone(),
                         transform: Transform::from_translation(item_pos.extend(1.0)),
                         ..default()
                     })
@@ -867,9 +867,9 @@ fn render(
     pico.auto_depth = 0.5;
 }
 
-fn get_bbox(rect: Vec2, uv_position: Vec2, anchor: &Anchor) -> Vec4 {
-    let half_size = rect * 0.5;
-    let a = uv_position - half_size + rect * -anchor.as_vec() * vec2(1.0, -1.0);
-    let b = uv_position + half_size + rect * -anchor.as_vec() * vec2(1.0, -1.0);
+fn get_bbox(size: Vec2, uv_position: Vec2, anchor: &Anchor) -> Vec4 {
+    let half_size = size * 0.5;
+    let a = uv_position - half_size + size * -anchor.as_vec() * vec2(1.0, -1.0);
+    let b = uv_position + half_size + size * -anchor.as_vec() * vec2(1.0, -1.0);
     vec4(a.x, a.y, b.x, b.y)
 }
