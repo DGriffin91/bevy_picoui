@@ -340,8 +340,8 @@ impl Pico {
             Val::VMax(n) => {
                 (n / 100.0) * (self.window_size.x.max(self.window_size.y) / self.window_size.x)
             }
-        } / parent_size.x;
-        vx
+        };
+        vx / parent_size.x
     }
 
     // get scaled u of uv within parent
@@ -358,8 +358,8 @@ impl Pico {
             Val::VMax(n) => {
                 (n / 100.0) * (self.window_size.x.max(self.window_size.y) / self.window_size.y)
             }
-        } / parent_size.y;
-        vy
+        };
+        vy / parent_size.y
     }
 
     pub fn get_state_mut(&mut self, index: ItemIndex) -> Option<&mut StateItem> {

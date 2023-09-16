@@ -73,6 +73,7 @@ pub struct DragValue {
     pub drag_index: ItemIndex,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn drag_value(
     pico: &mut Pico,
     drag_bg: Color,
@@ -100,7 +101,7 @@ pub fn drag_value(
     let mut dragging = false;
     if let Some(state) = pico.get_state(drag_index) {
         if let Some(drag) = state.drag {
-            value = drag.delta().x * scale + value;
+            value += drag.delta().x * scale;
             dragging = true;
         }
     };
@@ -122,7 +123,7 @@ pub fn drag_value(
         if let Some(state) = pico.get_state_mut(drag_index) {
             let mut just_selected = false;
             if state.storage.is_none() {
-                state.storage = Some(Box::new(String::new()));
+                state.storage = Some(Box::<String>::default());
             }
             if !dragging && released {
                 state.selected = true;
@@ -153,7 +154,7 @@ pub fn drag_value(
                             } else if e.char == enter {
                                 apply = true;
                                 break;
-                            } else if e.char.is_digit(10) || e.char == '.' || e.char == '-' {
+                            } else if e.char.is_ascii_digit() || e.char == '.' || e.char == '-' {
                                 s.push(e.char);
                             }
                         }
