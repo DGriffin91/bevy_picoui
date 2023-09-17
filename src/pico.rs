@@ -2,6 +2,7 @@ use bevy::{
     math::{vec2, vec4, Vec4Swizzles},
     prelude::*,
     sprite::Anchor,
+    text::DEFAULT_FONT_HANDLE,
     utils::HashMap,
 };
 use core::hash::Hash;
@@ -35,7 +36,10 @@ pub struct PicoItem {
     pub depth: Option<f32>,
     // 50% will result in a circle
     pub corner_radius: Val,
-    pub font_size: f32,
+    pub border_width: Val,
+    pub border_color: Color,
+    pub font_size: Val,
+    pub font: Handle<Font>,
     pub color: Color,
     pub background: Color,
     pub alignment: TextAlignment,
@@ -66,9 +70,12 @@ impl Default for PicoItem {
             position_3d: None,
             depth: None,
             corner_radius: Val::default(),
+            border_width: Val::default(),
+            border_color: Color::BLACK,
             uv_size: Vec2::ZERO,
             text: String::new(),
-            font_size: 0.02,
+            font_size: Val::Vh(2.0),
+            font: DEFAULT_FONT_HANDLE.typed(),
             color: Color::WHITE,
             background: Color::NONE,
             alignment: TextAlignment::Center,

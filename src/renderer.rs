@@ -147,7 +147,7 @@ pub fn render(
             }
         }
     }
-    let mut cached_materials: HashMap<u64, Handle<ColorMaterial>> = HashMap::new();
+    let mut cached_materials = ColorMaterialCache::default();
 
     // It seems that we need to add things in z order for them to show up in that order initially
     for (item, item_pos) in items.iter_mut().zip(item_positions.iter()) {
@@ -163,6 +163,12 @@ pub fn render(
                 * item.uv_size.y
                 * window_size.y;
             let size = item.uv_size * window_size;
+            let font_size =
+                pico.val_in_parent_y(item.font_size, item.uv_size) * item.uv_size.y * window_size.y;
+            let border_width = pico.val_in_parent_y(item.border_width, item.uv_size)
+                * item.uv_size.y
+                * window_size.y;
+            let border_width_x2 = border_width * 2.0;
 
             corner_radius = corner_radius.min(size.x).min(size.y);
 
@@ -180,9 +186,9 @@ pub fn render(
                 sections: vec![TextSection::new(
                     item.text.clone(),
                     TextStyle {
-                        font_size: item.font_size * window_size.y,
+                        font_size,
                         color: item.color,
-                        ..default()
+                        font: item.font.clone(),
                     },
                 )],
                 alignment: item.alignment,
@@ -203,20 +209,10 @@ pub fn render(
                     ..default()
                 });
 
-                let hasher = &mut DefaultHasher::new();
-                item.background.r().to_bits().hash(hasher);
-                item.background.g().to_bits().hash(hasher);
-                item.background.b().to_bits().hash(hasher);
-                item.background.a().to_bits().hash(hasher);
-                let mat_hash = hasher.finish();
-
-                let material_handle = if let Some(handle) = cached_materials.get(&mat_hash) {
-                    handle.clone()
-                } else {
-                    let handle = materials.add(ColorMaterial::from(item.background));
-                    cached_materials.insert(mat_hash, handle.clone());
-                    handle
-                };
+                let material_handle = cached_materials.get(item.background, &mut materials);
+                let border_material_handle =
+                    cached_materials.get(item.border_color, &mut materials);
+                let using_border = item.border_color.a() > 0.0 && border_width > 0.0;
 
                 entity.with_children(|builder| {
                     let item_anchor_vec = item.anchor.as_vec();
@@ -226,11 +222,26 @@ pub fn render(
                             corner_radius,
                             builder,
                             &mesh_handles,
-                            material_handle,
+                            if using_border {
+                                border_material_handle
+                            } else {
+                                material_handle.clone()
+                            },
                             anchor_trans,
                             size,
-                            item_anchor_vec,
+                            0.0,
                         );
+                        if using_border && border_width_x2 < size.x && border_width_x2 < size.y {
+                            generate_rect_entities(
+                                corner_radius,
+                                builder,
+                                &mesh_handles,
+                                material_handle,
+                                anchor_trans,
+                                size - Vec2::splat(border_width_x2),
+                                0.0000002,
+                            );
+                        }
                     }
 
                     builder.spawn(Text2dBundle {
@@ -287,6 +298,33 @@ pub fn render(
     pico.auto_depth = 0.5;
 }
 
+#[derive(Default)]
+struct ColorMaterialCache(HashMap<u64, Handle<ColorMaterial>>);
+
+impl ColorMaterialCache {
+    fn get(
+        &mut self,
+        color: Color,
+        materials: &mut Assets<ColorMaterial>,
+    ) -> Handle<ColorMaterial> {
+        let hasher = &mut DefaultHasher::new();
+        color.r().to_bits().hash(hasher);
+        color.g().to_bits().hash(hasher);
+        color.b().to_bits().hash(hasher);
+        color.a().to_bits().hash(hasher);
+        let mat_hash = hasher.finish();
+
+        let material_handle = if let Some(handle) = self.0.get(&mat_hash) {
+            handle.clone()
+        } else {
+            let handle = materials.add(ColorMaterial::from(color));
+            self.0.insert(mat_hash, handle.clone());
+            handle
+        };
+        material_handle
+    }
+}
+
 fn generate_rect_entities(
     corner_radius: f32,
     builder: &mut ChildBuilder,
@@ -294,8 +332,9 @@ fn generate_rect_entities(
     material_handle: Handle<ColorMaterial>,
     anchor_trans: Vec3,
     size: Vec2,
-    item_anchor_vec: Vec2,
+    depth_bias: f32,
 ) {
+    let anchor_trans = anchor_trans + vec3(0.0, 0.0, depth_bias);
     if corner_radius <= 0.0 {
         builder.spawn(MaterialMesh2dBundle {
             mesh: mesh_handles.rect.clone(),
@@ -345,7 +384,7 @@ fn generate_rect_entities(
                 mesh: mesh_handles.circle.clone(),
                 material: material_handle.clone(),
                 transform: Transform::from_translation(
-                    (offset + size * (-item_anchor_vec - 0.5)).extend(0.00000005),
+                    (anchor_trans.xy() + offset - size * 0.5).extend(0.0000001 + depth_bias),
                 )
                 .with_scale(Vec3::splat(corner_radius))
                 .with_rotation(Quat::from_rotation_z(angle)),

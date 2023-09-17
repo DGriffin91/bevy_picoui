@@ -303,7 +303,6 @@ fn update(
             corner_radius: Val::Percent(20.0),
             background: Color::rgba(0.0, 0.0, 0.0, 0.3),
             text: s.to_string(),
-            font_size: 0.02,
             ..default()
         }
     };
