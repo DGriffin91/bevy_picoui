@@ -58,8 +58,8 @@ fn update(mut pico: ResMut<Pico>, mut position: Local<Option<Vec2>>) {
         ..default()
     });
 
-    // Get the radius of the circle in pixels
-    let radius = pico.uv_scale_to_px(vec2(pico.val_x(Val::Vh(3.0)), 0.0)).x;
+    // Radius of the circle in Vh
+    let radius = Val::Vh(3.0);
 
     // Need to use a consistent id, usually the id is generated from spatial components of the item
     let id = 098743542350897;
@@ -70,17 +70,18 @@ fn update(mut pico: ResMut<Pico>, mut position: Local<Option<Vec2>>) {
         };
     }
 
+    // Clamp position to parent box
     let bbox = pico.bbox(main_box);
-    let min = pico.uv_position_to_px(bbox.xy()) + radius;
-    let max = pico.uv_position_to_px(bbox.zw()) - radius;
-    *position = position.clamp(min, max);
+    let mut size = (bbox.zw() - bbox.xy()) / 2.0;
+    size -= vec2(pico.val_x(radius), pico.val_y(radius)); // include circle radius
+    *position = position.clamp(-size, size);
 
     pico.add(PicoItem {
         depth: Some(0.9),
-        x: Val::Px(position.x),
-        y: Val::Px(position.y),
-        width: Val::Vh(6.0),
-        height: Val::Vh(6.0),
+        x: Val::Vw(position.x * 100.0),
+        y: Val::Vh(position.y * 100.0),
+        width: radius * 2.0,
+        height: radius * 2.0,
         corner_radius: Val::Vh(3.0),
         border_width: Val::Vh(0.1),
         border_color: Color::WHITE,

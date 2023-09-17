@@ -179,11 +179,11 @@ pub fn basic_drag_widget(
     parent: ItemIndex,
     label: &str,
     value: f32,
+    scale: f32,
     bg: Color,
     char_input_events: &mut EventReader<ReceivedCharacter>,
     relative: bool,
 ) -> f32 {
-    let scale = 0.01;
     let _guard = pico.hstack(Val::Percent(5.0), Val::Percent(1.0), parent);
     // Label Text
     pico.add(PicoItem {

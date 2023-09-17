@@ -453,7 +453,7 @@ impl Pico {
     }
 }
 
-/// Units are pixels
+/// Units uv of the window
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Drag {
     pub start: Vec2,

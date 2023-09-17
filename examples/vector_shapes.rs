@@ -102,7 +102,7 @@ fn update(
 
         values[i] = drag_value(
             &mut pico,
-            0.004,
+            1.5,
             values[i],
             drag_index,
             Some(&mut char_input_events),

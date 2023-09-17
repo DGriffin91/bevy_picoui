@@ -110,7 +110,7 @@ pub fn render(
                 if mouse_button_input.pressed(MouseButton::Left) && !first_interact_found {
                     if let Some(drag) = &mut existing_state_item.drag {
                         drag.last_frame = drag.end;
-                        drag.end = cursor_pos;
+                        drag.end = cursor_pos / window_size;
                     }
                 }
                 existing_state_item.bbox = get_bbox(
@@ -136,10 +136,11 @@ pub fn render(
                             && !*currently_dragging
                             && existing_state_item.drag.is_none()
                         {
+                            let cursor_uv_pos = cursor_pos / window_size;
                             existing_state_item.drag = Some(Drag {
-                                start: cursor_pos,
-                                end: cursor_pos,
-                                last_frame: cursor_pos,
+                                start: cursor_uv_pos,
+                                end: cursor_uv_pos,
+                                last_frame: cursor_uv_pos,
                             });
                         }
                     }

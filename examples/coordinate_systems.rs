@@ -229,6 +229,7 @@ fn update(
             parent,
             label,
             value,
+            5.0,
             bg,
             &mut char_input_events,
             relative,
