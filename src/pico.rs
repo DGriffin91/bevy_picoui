@@ -299,9 +299,20 @@ impl Pico {
         let vh = self.valp_y(item.height, parent_size) / parent_size.y;
 
         let pa_vec = item.anchor_parent.as_vec() * vec2(1.0, -1.0);
-        item.uv_position += vec2(vx, vy);
-        item.uv_position *= -pa_vec * 2.0;
-        item.uv_position += pa_vec + vec2(0.5, 0.5);
+        let mut uv_position = vec2(vx, vy);
+        uv_position *= -pa_vec * 2.0;
+        uv_position += pa_vec + vec2(0.5, 0.5);
+
+        // If anchor parent is center it should offset toward the bottom right
+        if pa_vec.x == 0.0 {
+            uv_position.x += vx;
+        }
+        if pa_vec.y == 0.0 {
+            uv_position.y += vy;
+        }
+
+        item.uv_position += uv_position;
+
         item.uv_position = lerp2(parent_2d_bbox.xy(), parent_2d_bbox.zw(), item.uv_position);
         item.uv_size += vec2(vw, vh);
         item.uv_size *= (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
@@ -388,11 +399,17 @@ impl Pico {
         self.val_y(v) * self.window_size.y
     }
 
-    pub fn uv_size_to_2d_trans(&self, uv: Vec2) -> Vec2 {
+    pub fn uv_scale_to_px(&self, uv: Vec2) -> Vec2 {
         uv * self.window_size
     }
 
-    pub fn uv_position_to_2d_trans(&self, uv: Vec2) -> Vec2 {
+    /// For setting px in Val::Px() where +y is down
+    pub fn uv_position_to_px(&self, uv: Vec2) -> Vec2 {
+        (uv - 0.5) * self.window_size
+    }
+
+    /// For setting px in Transform where +y is up
+    pub fn uv_position_to_ws_px(&self, uv: Vec2) -> Vec2 {
         (uv - 0.5) * vec2(1.0, -1.0) * self.window_size
     }
 
@@ -436,6 +453,7 @@ impl Pico {
     }
 }
 
+/// Units are pixels
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Drag {
     pub start: Vec2,

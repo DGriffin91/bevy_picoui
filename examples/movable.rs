@@ -39,14 +39,17 @@ fn setup(mut commands: Commands) {
     ));
 }
 
-fn update(mut pico: ResMut<Pico>) {
+fn update(mut pico: ResMut<Pico>, mut position: Local<Option<Vec2>>) {
+    if position.is_none() {
+        *position = Some(vec2(0.0, 0.0));
+    }
+    let position = position.as_mut().unwrap();
+
     let main_box = pico.add(PicoItem {
         depth: Some(0.01),
-        x: Val::Px(0.0),
-        y: Val::Px(0.0),
         width: Val::VMin(50.0),
         height: Val::VMin(50.0),
-        corner_radius: Val::Percent(4.0),
+        corner_radius: Val::Vh(3.0),
         border_width: Val::Px(1.0),
         border_color: Color::WHITE,
         anchor: Anchor::Center,
@@ -55,47 +58,39 @@ fn update(mut pico: ResMut<Pico>) {
         ..default()
     });
 
-    for parent_anchor in [
-        Anchor::Center,
-        Anchor::BottomLeft,
-        Anchor::BottomCenter,
-        Anchor::BottomRight,
-        Anchor::CenterLeft,
-        Anchor::CenterRight,
-        Anchor::TopLeft,
-        Anchor::TopCenter,
-        Anchor::TopRight,
-    ] {
-        // 0.0 for center anchors, multiplied by x,y so it is not offset for center axis
-        let center_anchor = (parent_anchor.as_vec() * 2.0).abs();
-        pico.add(PicoItem {
-            depth: Some(0.5),
-            x: Val::Px(8.0 * center_anchor.x),
-            y: Val::Px(8.0 * center_anchor.y),
-            width: Val::Px(48.0),
-            height: Val::Px(48.0),
-            corner_radius: Val::Px(4.0),
-            border_width: Val::Px(1.0),
-            border_color: Color::WHITE,
-            anchor: parent_anchor.clone(),
-            anchor_parent: parent_anchor.clone(),
-            background: BURNT_RED,
-            parent: Some(main_box),
-            ..default()
-        });
-        pico.add(PicoItem {
-            depth: Some(0.9),
-            width: Val::Px(16.0),
-            height: Val::Px(16.0),
-            corner_radius: Val::Px(4.0),
-            border_width: Val::Px(1.0),
-            border_color: Color::WHITE,
-            anchor_parent: parent_anchor.clone(),
-            background: CURRENT,
-            parent: Some(main_box),
-            ..default()
-        });
+    // Get the radius of the circle in pixels
+    let radius = pico.uv_scale_to_px(vec2(pico.val_x(Val::Vh(3.0)), 0.0)).x;
+
+    // Need to use a consistent id, usually the id is generated from spatial components of the item
+    let id = 098743542350897;
+    if let Some(state) = pico.state.get(&id) {
+        if let Some(drag) = state.drag {
+            let delta = drag.delta();
+            *position += delta;
+        };
     }
+
+    let bbox = pico.bbox(main_box);
+    let min = pico.uv_position_to_px(bbox.xy()) + radius;
+    let max = pico.uv_position_to_px(bbox.zw()) - radius;
+    *position = position.clamp(min, max);
+
+    pico.add(PicoItem {
+        depth: Some(0.9),
+        x: Val::Px(position.x),
+        y: Val::Px(position.y),
+        width: Val::Vh(6.0),
+        height: Val::Vh(6.0),
+        corner_radius: Val::Vh(3.0),
+        border_width: Val::Vh(0.1),
+        border_color: Color::WHITE,
+        background: BURNT_RED,
+        parent: Some(main_box),
+        anchor: Anchor::Center,
+        anchor_parent: Anchor::Center,
+        spatial_id: Some(id), // Manually set id
+        ..default()
+    });
 }
 
 // ------

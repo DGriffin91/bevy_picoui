@@ -86,10 +86,12 @@ fn update(
     .iter()
     .enumerate()
     {
+        // 0.0 for center anchors, multiplied by x,y so it is not offset for center axis
+        let center_anchor = (parent_anchor.as_vec() * 2.0).abs();
         let drag_index = pico.add(PicoItem {
             text: format!("{:.2}", values[i]),
-            x: Val::Vh(2.0),
-            y: Val::Vh(2.0),
+            x: Val::Vh(2.0 * center_anchor.x),
+            y: Val::Vh(2.0 * center_anchor.y),
             width: Val::Vh(5.0),
             height: Val::Vh(5.0),
             anchor: parent_anchor.clone(),
@@ -109,7 +111,7 @@ fn update(
 
         let p = pico.center(drag_index);
         points.push(p);
-        let ws_p = pico.uv_position_to_2d_trans(p);
+        let ws_p = pico.uv_position_to_ws_px(p);
         painter.color = Color::WHITE;
         painter.set_translation(ws_p.extend(pico.auto_depth()));
         painter.hollow = true;
@@ -122,7 +124,7 @@ fn update(
 
     painter.set_translation(Vec2::ZERO.extend(pico.auto_depth()));
     for i in 0..points.len() {
-        let a = pico.uv_position_to_2d_trans(points[i]);
+        let a = pico.uv_position_to_ws_px(points[i]);
         painter.color = Color::rgba(
             1.0,
             points[i].y * 1.2,
@@ -130,7 +132,7 @@ fn update(
             (values[i] * 0.5).powf(2.0),
         );
         for j in 0..points.len() {
-            let b = pico.uv_position_to_2d_trans(points[j]);
+            let b = pico.uv_position_to_ws_px(points[j]);
             if i != j {
                 painter.line(a.extend(0.0), b.extend(0.0));
             }
