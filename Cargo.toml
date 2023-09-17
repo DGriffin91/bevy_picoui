@@ -9,6 +9,7 @@ bevy = "0.11"
 [dev-dependencies]
 bevy_basic_camera = { git = "https://github.com/DGriffin91/bevy_basic_camera" }
 bevy_coordinate_systems = { git = "https://github.com/DGriffin91/bevy_coordinate_systems" }
+bevy_vector_shapes = "0.5.2"
 
 [profile.dev]
 opt-level = 3

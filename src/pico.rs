@@ -188,15 +188,15 @@ pub struct Pico {
     pub stack_guard: Guard,
     pub window_size: Vec2,
     pub mouse_button_input: Option<Input<MouseButton>>,
-    pub auto_depth: f32,
+    pub internal_auto_depth: f32,
 }
 
 impl Pico {
     pub fn vstack(&mut self, start: Val, margin: Val, parent: ItemIndex) -> Guard {
         let bbox = self.bbox(parent);
         let parent_size = (bbox.zw() - bbox.xy()).abs();
-        let start = self.val_in_parent_y(start, parent_size) * parent_size.y;
-        let margin = self.val_in_parent_y(margin, parent_size) * parent_size.y;
+        let start = self.valp_y(start, parent_size);
+        let margin = self.valp_y(margin, parent_size);
         self.stack_stack.push(Stack {
             end: start,
             margin,
@@ -209,8 +209,8 @@ impl Pico {
     pub fn hstack(&mut self, start: Val, margin: Val, parent: ItemIndex) -> Guard {
         let bbox = self.bbox(parent);
         let parent_size = (bbox.zw() - bbox.xy()).abs();
-        let start = self.val_in_parent_x(start, parent_size) * parent_size.x;
-        let margin = self.val_in_parent_x(margin, parent_size) * parent_size.x;
+        let start = self.valp_x(start, parent_size);
+        let margin = self.valp_x(margin, parent_size);
         self.stack_stack.push(Stack {
             end: start,
             margin,
@@ -255,8 +255,18 @@ impl Pico {
         vec4(0.0, 0.0, 1.0, 1.0)
     }
 
+    pub fn center(&self, index: ItemIndex) -> Vec2 {
+        let bbox = self.bbox(index);
+        (bbox.xy() + bbox.zw()) / 2.0
+    }
+
     pub fn hovered(&self, index: ItemIndex) -> bool {
         self.get_hovered(index).is_some()
+    }
+
+    pub fn auto_depth(&mut self) -> f32 {
+        self.internal_auto_depth += 0.000001;
+        self.internal_auto_depth
     }
 
     pub fn add(&mut self, mut item: PicoItem) -> ItemIndex {
@@ -269,8 +279,7 @@ impl Pico {
                         *depth += 0.000001;
                     }
                 } else {
-                    self.auto_depth += 0.000001;
-                    item.depth = Some((parent_depth + 0.000001).max(self.auto_depth));
+                    item.depth = Some((parent_depth + 0.000001).max(self.auto_depth()));
                 }
             }
             self.bbox(parent)
@@ -279,16 +288,15 @@ impl Pico {
         };
 
         if item.depth.is_none() {
-            self.auto_depth += 0.000001;
-            item.depth = Some(self.auto_depth);
+            item.depth = Some(self.auto_depth());
         }
 
         let parent_size = (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
 
-        let vx = self.val_in_parent_x(item.x, parent_size);
-        let vy = self.val_in_parent_y(item.y, parent_size);
-        let vw = self.val_in_parent_x(item.width, parent_size);
-        let vh = self.val_in_parent_y(item.height, parent_size);
+        let vx = self.valp_x(item.x, parent_size) / parent_size.x;
+        let vy = self.valp_y(item.y, parent_size) / parent_size.y;
+        let vw = self.valp_x(item.width, parent_size) / parent_size.x;
+        let vh = self.valp_y(item.height, parent_size) / parent_size.y;
 
         let pa_vec = item.anchor_parent.as_vec() * vec2(1.0, -1.0);
         item.uv_position += vec2(vx, vy);
@@ -330,9 +338,9 @@ impl Pico {
         ItemIndex(self.items.len() - 1)
     }
 
-    // get scaled v of uv within parent
-    pub fn val_in_parent_x(&self, x: Val, parent_size: Vec2) -> f32 {
-        let vx = match x {
+    // get scaled v of uv for val
+    pub fn valp_x(&self, x: Val, parent_size: Vec2) -> f32 {
+        match x {
             Val::Auto => 0.0,
             Val::Px(n) => n / self.window_size.x,
             Val::Percent(n) => (n / 100.0) * parent_size.x,
@@ -344,13 +352,12 @@ impl Pico {
             Val::VMax(n) => {
                 (n / 100.0) * (self.window_size.x.max(self.window_size.y) / self.window_size.x)
             }
-        };
-        vx / parent_size.x
+        }
     }
 
-    // get scaled u of uv within parent
-    pub fn val_in_parent_y(&self, y: Val, parent_size: Vec2) -> f32 {
-        let vy = match y {
+    // get scaled u of uv for val
+    pub fn valp_y(&self, y: Val, parent_size: Vec2) -> f32 {
+        match y {
             Val::Auto => 0.0,
             Val::Px(n) => n / self.window_size.y,
             Val::Percent(n) => (n / 100.0) * parent_size.y,
@@ -362,8 +369,31 @@ impl Pico {
             Val::VMax(n) => {
                 (n / 100.0) * (self.window_size.x.max(self.window_size.y) / self.window_size.y)
             }
-        };
-        vy / parent_size.y
+        }
+    }
+
+    pub fn val_x(&self, v: Val) -> f32 {
+        self.valp_x(v, Vec2::ONE)
+    }
+
+    pub fn val_y(&self, v: Val) -> f32 {
+        self.valp_y(v, Vec2::ONE)
+    }
+
+    pub fn val_x_px(&self, v: Val) -> f32 {
+        self.val_x(v) * self.window_size.x
+    }
+
+    pub fn val_y_px(&self, v: Val) -> f32 {
+        self.val_y(v) * self.window_size.y
+    }
+
+    pub fn uv_size_to_2d_trans(&self, uv: Vec2) -> Vec2 {
+        uv * self.window_size
+    }
+
+    pub fn uv_position_to_2d_trans(&self, uv: Vec2) -> Vec2 {
+        (uv - 0.5) * vec2(1.0, -1.0) * self.window_size
     }
 
     pub fn get_state_mut(&mut self, index: ItemIndex) -> Option<&mut StateItem> {

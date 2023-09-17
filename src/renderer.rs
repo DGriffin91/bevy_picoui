@@ -159,15 +159,10 @@ pub fn render(
             true
         };
         if generate || pico.window_size != window_size {
-            let mut corner_radius = pico.val_in_parent_y(item.corner_radius, item.uv_size)
-                * item.uv_size.y
-                * window_size.y;
+            let mut corner_radius = pico.valp_y(item.corner_radius, item.uv_size) * window_size.y;
             let size = item.uv_size * window_size;
-            let font_size =
-                pico.val_in_parent_y(item.font_size, item.uv_size) * item.uv_size.y * window_size.y;
-            let border_width = pico.val_in_parent_y(item.border_width, item.uv_size)
-                * item.uv_size.y
-                * window_size.y;
+            let font_size = pico.valp_y(item.font_size, item.uv_size) * window_size.y;
+            let border_width = pico.valp_y(item.border_width, item.uv_size) * window_size.y;
             let border_width_x2 = border_width * 2.0;
 
             corner_radius = corner_radius.min(size.x).min(size.y);
@@ -295,7 +290,7 @@ pub fn render(
     pico.interacting = interacting;
     pico.window_size = window_size;
     pico.mouse_button_input = Some(mouse_button_input.clone());
-    pico.auto_depth = 0.5;
+    pico.internal_auto_depth = 0.5;
 }
 
 #[derive(Default)]

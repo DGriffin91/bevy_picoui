@@ -82,7 +82,8 @@ pub fn drag_value(
     let mut dragging = false;
     if let Some(state) = pico.get_state(drag_index) {
         if let Some(drag) = state.drag {
-            value += drag.delta().x * scale;
+            let delta = drag.delta();
+            value += (delta.x - delta.y) * scale;
             dragging = true;
         }
     };
