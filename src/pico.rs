@@ -42,10 +42,10 @@ pub struct PicoItem {
     pub font: Handle<Font>,
     pub color: Color,
     pub background: Color,
-    pub alignment: TextAlignment,
     pub anchor: Anchor,
-    pub anchor_text: Anchor,
     pub anchor_parent: Anchor,
+    pub anchor_text: Anchor,
+    pub text_alignment: TextAlignment,
     /// If life is 0.0, it will only live one frame (default), if life is f32::INFINITY it will live forever.
     pub life: f32,
     /// If the id changes, the item is re-rendered
@@ -78,7 +78,7 @@ impl Default for PicoItem {
             font: DEFAULT_FONT_HANDLE.typed(),
             color: Color::WHITE,
             background: Color::NONE,
-            alignment: TextAlignment::Center,
+            text_alignment: TextAlignment::Center,
             anchor_text: Anchor::Center,
             anchor: Anchor::Center,
             anchor_parent: Anchor::TopLeft,
@@ -172,11 +172,12 @@ pub fn lerp(start: f32, end: f32, t: f32) -> f32 {
     (1.0 - t) * start + t * end
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct Stack {
     pub end: f32,
     pub margin: f32,
     pub vertical: bool,
+    pub bypass: bool,
 }
 
 #[derive(Resource, Default)]
@@ -201,6 +202,7 @@ impl Pico {
             end: start,
             margin,
             vertical: true,
+            bypass: false,
         });
         self.stack_guard.push();
         self.stack_guard.clone()
@@ -215,6 +217,16 @@ impl Pico {
             end: start,
             margin,
             vertical: false,
+            bypass: false,
+        });
+        self.stack_guard.push();
+        self.stack_guard.clone()
+    }
+
+    pub fn stack_bypass(&mut self) -> Guard {
+        self.stack_stack.push(Stack {
+            bypass: true,
+            ..default()
         });
         self.stack_guard.push();
         self.stack_guard.clone()
@@ -320,16 +332,18 @@ impl Pico {
         while (self.stack_guard.get() as usize) < self.stack_stack.len() {
             self.stack_stack.pop();
         }
-        if !self.stack_stack.is_empty() {
+        if !self.stack_stack.is_empty() && item.parent.is_some() {
             let stack = self.stack_stack.last_mut().unwrap();
-            if stack.vertical {
-                item.uv_position.y += stack.end;
-                let bbox = get_bbox(item.uv_size, item.uv_position, &item.anchor);
-                stack.end = stack.end.max(bbox.w - parent_2d_bbox.y) + stack.margin;
-            } else {
-                item.uv_position.x += stack.end;
-                let bbox = get_bbox(item.uv_size, item.uv_position, &item.anchor);
-                stack.end = stack.end.max(bbox.z - parent_2d_bbox.x) + stack.margin;
+            if !stack.bypass {
+                if stack.vertical {
+                    item.uv_position.y += stack.end;
+                    let bbox = get_bbox(item.uv_size, item.uv_position, &item.anchor);
+                    stack.end = stack.end.max(bbox.w - parent_2d_bbox.y) + stack.margin;
+                } else {
+                    item.uv_position.x += stack.end;
+                    let bbox = get_bbox(item.uv_size, item.uv_position, &item.anchor);
+                    stack.end = stack.end.max(bbox.z - parent_2d_bbox.x) + stack.margin;
+                }
             }
         }
 

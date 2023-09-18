@@ -196,7 +196,7 @@ fn update(
         y: Val::Vh(1.0),
         width: Val::Vh(30.0),
         height: Val::Vh(10.0),
-        alignment: TextAlignment::Right,
+        text_alignment: TextAlignment::Right,
         background: Color::rgba(0.0, 0.0, 0.0, 0.3),
         ..default()
     });
@@ -211,7 +211,7 @@ fn update(
         width: Val::Vh(20.0),
         height: Val::Vh(100.0),
         anchor: Anchor::TopLeft,
-        alignment: TextAlignment::Left,
+        text_alignment: TextAlignment::Left,
         background: Color::rgba(0.2, 0.2, 0.2, 0.2),
         ..default()
     });

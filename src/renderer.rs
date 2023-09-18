@@ -187,7 +187,7 @@ pub fn render(
                         font: item.font.clone(),
                     },
                 )],
-                alignment: item.alignment,
+                alignment: item.text_alignment,
                 linebreak_behavior: BreakLineOn::WordBoundary,
             };
             state_item.life = item.life;
@@ -259,12 +259,21 @@ pub fn render(
                 state_item.entity = Some(entity.id());
             } else {
                 let entity = commands
-                    .spawn(Text2dBundle {
-                        text,
-                        text_anchor: item.anchor_text.clone(),
-                        transform: Transform::from_translation(item_pos.extend(1.0)),
-                        ..default()
-                    })
+                    .spawn((
+                        PicoEntity {
+                            spatial_id,
+                            anchor: item.anchor.clone(),
+                            size,
+                        },
+                        Text2dBundle {
+                            text,
+                            text_anchor: item.anchor_text.clone(),
+                            transform: Transform::from_translation(
+                                item_pos.extend(item.depth.unwrap()),
+                            ),
+                            ..default()
+                        },
+                    ))
                     .id();
                 state_item.entity = Some(entity);
             }
