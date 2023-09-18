@@ -9,7 +9,7 @@ use core::hash::Hash;
 use core::hash::Hasher;
 use std::collections::hash_map::DefaultHasher;
 
-use crate::guard::Guard;
+use crate::{guard::Guard, renderer::MAJOR_DEPTH_AUTO_STEP};
 
 #[derive(Clone, Copy, Debug)]
 pub struct ItemIndex(pub usize);
@@ -280,7 +280,7 @@ impl Pico {
     }
 
     pub fn auto_depth(&mut self) -> f32 {
-        self.internal_auto_depth += 0.000001;
+        self.internal_auto_depth += MAJOR_DEPTH_AUTO_STEP;
         self.internal_auto_depth
     }
 
@@ -292,13 +292,12 @@ impl Pico {
                     *depth += parent_depth;
                     if *depth == parent_depth {
                         // Make sure child is in front of parent if they were at the same z
-                        *depth += 0.000001;
+                        *depth += MAJOR_DEPTH_AUTO_STEP;
                     }
                 } else {
                     item.depth = Some(
-                        (parent_depth + 0.000001)
-                            .max(parent.child_max_depth + 0.000001)
-                            .max(self.auto_depth()),
+                        (parent_depth + MAJOR_DEPTH_AUTO_STEP)
+                            .max(parent.child_max_depth + MAJOR_DEPTH_AUTO_STEP),
                     );
                 }
             }

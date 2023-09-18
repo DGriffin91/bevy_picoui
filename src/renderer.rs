@@ -21,6 +21,9 @@ pub struct PicoEntity {
     pub size: Vec2,
 }
 
+pub const MAJOR_DEPTH_AUTO_STEP: f32 = 0.000001;
+pub const MINOR_DEPTH_AUTO_STEP: f32 = 0.0000001;
+
 #[allow(clippy::too_many_arguments)]
 pub fn render(
     mut commands: Commands,
@@ -90,7 +93,7 @@ pub fn render(
         }
 
         let item_pos = item_ndc.xy() * window_size * 0.5;
-        item_positions.push(item_pos);
+        item_positions.push(item_pos.extend(item_ndc.z));
 
         if let Some(existing_state_item) = pico.state.get_mut(&spatial_id) {
             // If a item in the state matches one created this frame keep it around
@@ -193,7 +196,7 @@ pub fn render(
             state_item.life = item.life;
             state_item.id = item.id.unwrap();
             if item.uv_size.x > 0.0 || item.uv_size.y > 0.0 {
-                let trans = Transform::from_translation(item_pos.extend(1.0));
+                let trans = Transform::from_translation(*item_pos);
                 let mut entity = commands.spawn(PicoEntity {
                     spatial_id,
                     anchor: item.anchor.clone(),
@@ -235,7 +238,7 @@ pub fn render(
                                 material_handle,
                                 anchor_trans,
                                 size - Vec2::splat(border_width_x2),
-                                0.0000002,
+                                MINOR_DEPTH_AUTO_STEP,
                             );
                         }
                     }
@@ -268,9 +271,7 @@ pub fn render(
                         Text2dBundle {
                             text,
                             text_anchor: item.anchor_text.clone(),
-                            transform: Transform::from_translation(
-                                item_pos.extend(item.depth.unwrap()),
-                            ),
+                            transform: Transform::from_translation(*item_pos),
                             ..default()
                         },
                     ))
@@ -389,7 +390,8 @@ fn generate_rect_entities(
                 mesh: mesh_handles.circle.clone(),
                 material: material_handle.clone(),
                 transform: Transform::from_translation(
-                    (anchor_trans.xy() + offset - size * 0.5).extend(0.0000001 + depth_bias),
+                    (anchor_trans.xy() + offset - size * 0.5)
+                        .extend(MINOR_DEPTH_AUTO_STEP + depth_bias),
                 )
                 .with_scale(Vec3::splat(corner_radius))
                 .with_rotation(Quat::from_rotation_z(angle)),
