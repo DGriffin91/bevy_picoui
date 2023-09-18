@@ -34,6 +34,8 @@ pub struct PicoItem {
     /// z position for 2d 1.0 is closer to camera 0.0 is further
     /// None for auto (calculated by order)
     pub depth: Option<f32>,
+    /// Max z position of immediate children, used for auto z
+    pub child_max_depth: f32,
     // 50% will result in a circle
     pub corner_radius: Val,
     pub border_width: Val,
@@ -69,6 +71,7 @@ impl Default for PicoItem {
             uv_position: Vec2::ZERO,
             position_3d: None,
             depth: None,
+            child_max_depth: 0.0,
             corner_radius: Val::default(),
             border_width: Val::default(),
             border_color: Color::BLACK,
@@ -282,8 +285,9 @@ impl Pico {
     }
 
     pub fn add(&mut self, mut item: PicoItem) -> ItemIndex {
-        let parent_2d_bbox = if let Some(parent) = item.parent {
-            if let Some(parent_depth) = self.get(parent).depth {
+        if let Some(parent_index) = item.parent {
+            let parent = self.get(parent_index);
+            if let Some(parent_depth) = parent.depth {
                 if let Some(depth) = &mut item.depth {
                     *depth += parent_depth;
                     if *depth == parent_depth {
@@ -291,17 +295,26 @@ impl Pico {
                         *depth += 0.000001;
                     }
                 } else {
-                    item.depth = Some((parent_depth + 0.000001).max(self.auto_depth()));
+                    item.depth = Some(
+                        (parent_depth + 0.000001)
+                            .max(parent.child_max_depth + 0.000001)
+                            .max(self.auto_depth()),
+                    );
                 }
             }
-            self.bbox(parent)
-        } else {
-            vec4(0.0, 0.0, 1.0, 1.0)
-        };
+        }
 
         if item.depth.is_none() {
             item.depth = Some(self.auto_depth());
         }
+
+        let parent_2d_bbox = if let Some(parent_index) = item.parent {
+            let parent = self.get_mut(parent_index);
+            parent.child_max_depth = parent.child_max_depth.max(item.depth.unwrap());
+            self.bbox(parent_index)
+        } else {
+            vec4(0.0, 0.0, 1.0, 1.0)
+        };
 
         let parent_size = (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
 

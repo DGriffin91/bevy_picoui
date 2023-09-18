@@ -99,10 +99,7 @@ fn update(mut pico: ResMut<Pico>, windows: Query<&Window>) {
                                     color: Color::BLACK,
                                     ..default()
                                 };
-                                let first_text = pico.add(text.clone());
-                                // TODO keep track of auto depth within parent
-                                let depth = pico.get(first_text).depth.unwrap();
-                                text.depth = Some(depth + 0.000001);
+                                pico.add(text.clone());
                                 text.color = Color::WHITE;
                                 text.x = Val::Px(0.0);
                                 text.y = Val::Px(0.0);
