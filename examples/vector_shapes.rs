@@ -3,6 +3,7 @@ use std::{f32::consts::TAU, time::Duration};
 use bevy::{asset::ChangeWatcher, math::*, prelude::*, sprite::Anchor};
 
 use bevy_picoui::{
+    palette::RGB_PALETTE,
     pico::{Pico, Pico2dCamera, PicoItem},
     widgets::drag_value,
     PicoPlugin,
@@ -52,7 +53,7 @@ fn update(
         border_color: Color::WHITE,
         anchor: Anchor::Center,
         anchor_parent: Anchor::Center,
-        background: SLATE,
+        background: RGB_PALETTE[1][0],
         ..default()
     });
     let mut points = Vec::new();
@@ -123,14 +124,3 @@ fn update(
         }
     }
 }
-
-// ------
-// Colors
-// ------
-
-pub const SLATE: Color = Color::Rgba {
-    red: 0.156,
-    green: 0.239,
-    blue: 0.231,
-    alpha: 1.0,
-};

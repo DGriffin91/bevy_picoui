@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy::{asset::ChangeWatcher, prelude::*, sprite::Anchor};
 
 use bevy_picoui::{
-    palette::PALETTE,
+    palette::RGB_PALETTE,
     pico::{Pico, Pico2dCamera, PicoItem},
     PicoPlugin,
 };
@@ -62,7 +62,7 @@ fn update(mut pico: ResMut<Pico>, windows: Query<&Window>) {
                     });
                     {
                         let _guard = pico.stack_bypass();
-                        let color = PALETTE[j + i * 7];
+                        let color = RGB_PALETTE[i][j];
                         let btn = pico.add(PicoItem {
                             x: Val::Percent(10.0),
                             y: Val::Percent(10.0),
@@ -115,35 +115,3 @@ fn update(mut pico: ResMut<Pico>, windows: Query<&Window>) {
         }
     }
 }
-
-// ------
-// Colors
-// ------
-
-pub const SLATE: Color = Color::Rgba {
-    red: 0.156,
-    green: 0.239,
-    blue: 0.231,
-    alpha: 1.0,
-};
-
-pub const CURRENT: Color = Color::Rgba {
-    red: 0.098,
-    green: 0.447,
-    blue: 0.470,
-    alpha: 1.0,
-};
-
-pub const BURNT_RED: Color = Color::Rgba {
-    red: 0.466,
-    green: 0.180,
-    blue: 0.145,
-    alpha: 1.0,
-};
-
-pub const OILVINE: Color = Color::Rgba {
-    red: 0.549,
-    green: 0.702,
-    blue: 0.412,
-    alpha: 1.0,
-};

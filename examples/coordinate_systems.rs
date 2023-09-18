@@ -356,21 +356,21 @@ fn update(
 // ------
 
 pub const RED: Color = Color::Rgba {
-    red: 0.3,
-    green: 0.15,
-    blue: 0.15,
+    red: 0.25,
+    green: 0.18,
+    blue: 0.18,
     alpha: 1.0,
 };
 pub const GREEN: Color = Color::Rgba {
-    red: 0.15,
-    green: 0.3,
-    blue: 0.15,
+    red: 0.18,
+    green: 0.25,
+    blue: 0.18,
     alpha: 1.0,
 };
 pub const BLUE: Color = Color::Rgba {
-    red: 0.15,
-    green: 0.15,
-    blue: 0.3,
+    red: 0.18,
+    green: 0.18,
+    blue: 0.25,
     alpha: 1.0,
 };
 pub const DARK_GRAY: Color = Color::Rgba {
