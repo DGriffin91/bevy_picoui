@@ -2,7 +2,7 @@ use bevy::{math::*, prelude::*, sprite::Anchor};
 
 use bevy_picoui::{
     palette::RGB_PALETTE,
-    pico::{Pico, Pico2dCamera, PicoItem},
+    pico::{ItemStyle, Pico, Pico2dCamera, PicoItem},
     widgets::toggle_button,
     PicoPlugin,
 };
@@ -28,7 +28,10 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
         width: Val::Vh(70.0),
         height: Val::Vh(50.0),
         anchor: Anchor::Center,
-        background: Color::WHITE * 0.2,
+        style: ItemStyle {
+            background: Color::WHITE * 0.2,
+            ..default()
+        },
         ..default()
     });
 
@@ -39,7 +42,10 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
             let lane = pico.add(PicoItem {
                 width: Val::Percent(100.0),
                 height: Val::Percent(9.0),
-                background: RGB_PALETTE[1][1],
+                style: ItemStyle {
+                    background: RGB_PALETTE[1][1],
+                    ..default()
+                },
                 anchor: Anchor::TopLeft,
                 parent: Some(main_box),
                 ..default()
@@ -53,8 +59,11 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
                             y: Val::Percent(50.0),
                             width: Val::Percent(9.0),
                             height: Val::Percent(80.0),
-                            corner_radius: Val::Percent(50.0),
-                            background: RGB_PALETTE[1][4],
+                            style: ItemStyle {
+                                corner_radius: Val::Percent(50.0),
+                                background: RGB_PALETTE[1][4],
+                                ..default()
+                            },
                             anchor: Anchor::CenterLeft,
                             parent: Some(lane),
                             ..default()

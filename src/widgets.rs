@@ -1,7 +1,7 @@
 use bevy::{math::vec2, prelude::*, sprite::Anchor};
 
 use crate::{
-    pico::{ItemIndex, PicoItem},
+    pico::{ItemIndex, ItemStyle, PicoItem},
     Pico,
 };
 
@@ -11,8 +11,8 @@ use crate::{
 
 pub fn button(pico: &mut Pico, item: PicoItem) -> ItemIndex {
     let index = pico.add(item);
-    let c = pico.get(index).background;
-    pico.get_mut(index).background = if pico.hovered(index) {
+    let c = pico.get(index).style.background;
+    pico.get_mut(index).style.background = if pico.hovered(index) {
         c + Vec4::splat(0.06)
     } else {
         c
@@ -31,14 +31,14 @@ pub fn toggle_button(
     toggle_state: &mut bool,
 ) -> ItemIndex {
     let index = pico.add(item);
-    let mut c = pico.get(index).background;
+    let mut c = pico.get(index).style.background;
     if pico.clicked(index) {
         *toggle_state = !*toggle_state;
     }
     if *toggle_state {
         c = enabled_bg;
     }
-    pico.get_mut(index).background = if pico.hovered(index) {
+    pico.get_mut(index).style.background = if pico.hovered(index) {
         c + Vec4::splat(0.06)
     } else {
         c
@@ -57,7 +57,10 @@ pub fn hr(pico: &mut Pico, width: Val, height: Val, parent: Option<ItemIndex>) -
         uv_position: vec2(0.5, 0.0),
         width,
         height,
-        background: Color::rgba(1.0, 1.0, 1.0, 0.04),
+        style: ItemStyle {
+            background: Color::rgba(1.0, 1.0, 1.0, 0.04),
+            ..default()
+        },
         anchor: Anchor::TopCenter,
         parent,
         ..default()
@@ -77,7 +80,7 @@ pub fn drag_value(
     char_input_events: Option<&mut EventReader<ReceivedCharacter>>,
 ) -> f32 {
     let mut value = value;
-    let mut drag_bg = pico.get_mut(drag_index).background;
+    let mut drag_bg = pico.get_mut(drag_index).style.background;
 
     let mut dragging = false;
     if let Some(state) = pico.get_state(drag_index) {
@@ -162,7 +165,7 @@ pub fn drag_value(
             drag_bg += Vec4::splat(0.25);
         }
     }
-    pico.get_mut(drag_index).background = if pico.hovered(drag_index) || dragging {
+    pico.get_mut(drag_index).style.background = if pico.hovered(drag_index) || dragging {
         drag_bg + Vec4::splat(0.06)
     } else {
         drag_bg
@@ -190,7 +193,10 @@ pub fn basic_drag_widget(
         text: label.to_string(),
         width: Val::Percent(60.0),
         height: Val::Percent(100.0),
-        anchor_text: Anchor::CenterLeft,
+        style: ItemStyle {
+            anchor_text: Anchor::CenterLeft,
+            ..default()
+        },
         anchor: Anchor::TopLeft,
         parent: Some(parent),
         ..default()
@@ -200,10 +206,13 @@ pub fn basic_drag_widget(
         text: format!("{:.2}", value),
         width: Val::Percent(30.0),
         height: Val::Percent(100.0),
-        corner_radius: Val::Percent(10.0),
+        style: ItemStyle {
+            corner_radius: Val::Percent(10.0),
+            background: bg,
+            ..default()
+        },
         anchor: Anchor::TopLeft,
         parent: Some(parent),
-        background: bg,
         ..default()
     });
     let value = drag_value(pico, scale, value, drag_index, Some(char_input_events));

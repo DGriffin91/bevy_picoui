@@ -19,7 +19,7 @@ use bevy::{
 };
 
 use bevy_picoui::{
-    pico::{ItemIndex, Pico, Pico2dCamera, PicoItem},
+    pico::{ItemIndex, ItemStyle, Pico, Pico2dCamera, PicoItem},
     PicoPlugin,
 };
 
@@ -109,17 +109,20 @@ fn spawn_button(
         width: Val::Percent(width),
         height: Val::Percent(width),
         anchor: Anchor::Center,
-        background: background_color,
-        border_color,
-        border_width: border,
-        font_size: Val::Px(FONT_SIZE),
+        style: ItemStyle {
+            background: background_color,
+            border_color,
+            border_width: border,
+            font_size: Val::Px(FONT_SIZE),
+            ..default()
+        },
         parent: Some(parent.clone()),
         ..default()
     });
     let hovered = pico.hovered(btn_index);
     let btn = pico.get_mut(btn_index);
     if hovered {
-        btn.background = Color::ORANGE_RED;
+        btn.style.background = Color::ORANGE_RED;
     }
     if spawn_text {
         btn.text = format!("{i}, {j}");

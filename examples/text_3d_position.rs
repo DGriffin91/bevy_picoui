@@ -3,7 +3,7 @@ use bevy::{math::*, prelude::*, render::view::RenderLayers, sprite::Anchor};
 use bevy_basic_camera::{CameraController, CameraControllerPlugin};
 use bevy_coordinate_systems::CoordinateTransformationsPlugin;
 use bevy_picoui::{
-    pico::{Pico, Pico2dCamera, PicoItem},
+    pico::{ItemStyle, Pico, Pico2dCamera, PicoItem},
     PicoPlugin,
 };
 
@@ -83,7 +83,10 @@ fn update(mut gizmos: Gizmos, mut pico: ResMut<Pico>) {
     pico.add(PicoItem {
         uv_position: vec2(0.02, 0.02),
         text: String::from("Click and drag to orbit camera\nDolly with scroll wheel\nMove with WASD\n\nHover over the Y axis text"),
-        anchor_text: Anchor::TopLeft,
+        style: ItemStyle {
+            anchor_text: Anchor::TopLeft,
+            ..default()
+        },
         ..default()
     });
 
@@ -94,14 +97,17 @@ fn update(mut gizmos: Gizmos, mut pico: ResMut<Pico>) {
     let axis_text_index = pico.add(PicoItem {
         position_3d: Some(Vec3::Y * 1.1),
         uv_size: vec2(0.02, 0.02),
-        background: Color::rgba(0.1, 0.1, 0.1, 0.5),
+        style: ItemStyle {
+            background: Color::rgba(0.1, 0.1, 0.1, 0.5),
+            ..default()
+        },
         text: String::from("Y+"),
         anchor: Anchor::TopLeft,
         ..default()
     });
     if pico.hovered(axis_text_index) {
         // Make axis text more opaque
-        pico.get_mut(axis_text_index).background = Color::rgba(0.1, 0.1, 0.1, 0.8);
+        pico.get_mut(axis_text_index).style.background = Color::rgba(0.1, 0.1, 0.1, 0.8);
 
         // Get 2d bounding box of axis text
         let state = pico.get_state(axis_text_index).unwrap();
@@ -111,7 +117,10 @@ fn update(mut gizmos: Gizmos, mut pico: ResMut<Pico>) {
         pico.add(PicoItem {
             uv_position: position,
             uv_size: vec2(0.1, 0.02),
-            background: Color::rgba(0.1, 0.1, 0.1, 0.8),
+            style: ItemStyle {
+                background: Color::rgba(0.1, 0.1, 0.1, 0.8),
+                ..default()
+            },
             text: String::from("HELLO WORLD"),
             anchor: Anchor::TopLeft,
             ..default()

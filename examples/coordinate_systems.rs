@@ -14,7 +14,7 @@ use bevy::{
 use bevy_basic_camera::{CameraController, CameraControllerPlugin};
 use bevy_coordinate_systems::{CoordinateTransformationsPlugin, View};
 use bevy_picoui::{
-    pico::{Pico, Pico2dCamera, PicoItem},
+    pico::{ItemStyle, Pico, Pico2dCamera, PicoItem},
     widgets::{basic_drag_widget, button, hr},
     PicoPlugin,
 };
@@ -185,13 +185,16 @@ fn update(
         ),
         anchor_parent: Anchor::BottomRight,
         anchor: Anchor::BottomRight,
-        anchor_text: Anchor::BottomRight,
+        style: ItemStyle {
+            anchor_text: Anchor::BottomRight,
+            text_alignment: TextAlignment::Right,
+            background: Color::rgba(0.0, 0.0, 0.0, 0.3),
+            ..default()
+        },
         x: Val::Vh(1.0),
         y: Val::Vh(1.0),
         width: Val::Vh(30.0),
         height: Val::Vh(10.0),
-        text_alignment: TextAlignment::Right,
-        background: Color::rgba(0.0, 0.0, 0.0, 0.3),
         ..default()
     });
 
@@ -205,8 +208,11 @@ fn update(
         width: Val::Vh(20.0),
         height: Val::Vh(100.0),
         anchor: Anchor::TopLeft,
-        text_alignment: TextAlignment::Left,
-        background: Color::rgba(0.2, 0.2, 0.2, 0.2),
+        style: ItemStyle {
+            text_alignment: TextAlignment::Left,
+            background: Color::rgba(0.2, 0.2, 0.2, 0.2),
+            ..default()
+        },
         ..default()
     });
 
@@ -275,9 +281,12 @@ fn update(
                 x: Val::Percent(50.0),
                 width: Val::Percent(90.0),
                 height: Val::Vh(4.0),
-                corner_radius: Val::Percent(10.0),
+                style: ItemStyle {
+                    corner_radius: Val::Percent(10.0),
+                    background: DARK_GRAY,
+                    ..default()
+                },
                 anchor: Anchor::TopCenter,
-                background: DARK_GRAY,
                 text: "RESET CAMERA".to_string(),
                 parent: Some(side_bar),
                 ..default()
@@ -295,8 +304,11 @@ fn update(
             position_3d: Some(p),
             width: Val::Vh(3.0),
             height: Val::Vh(2.0),
-            corner_radius: Val::Percent(20.0),
-            background: Color::rgba(0.0, 0.0, 0.0, 0.3),
+            style: ItemStyle {
+                corner_radius: Val::Percent(20.0),
+                background: Color::rgba(0.0, 0.0, 0.0, 0.3),
+                ..default()
+            },
             text: s.to_string(),
             ..default()
         }

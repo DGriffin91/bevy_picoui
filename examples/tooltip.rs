@@ -2,7 +2,7 @@ use bevy::{prelude::*, sprite::Anchor};
 
 use bevy_picoui::{
     palette::RGB_PALETTE,
-    pico::{Pico, Pico2dCamera, PicoItem},
+    pico::{ItemStyle, Pico, Pico2dCamera, PicoItem},
     PicoPlugin,
 };
 
@@ -27,7 +27,10 @@ fn update(mut pico: ResMut<Pico>, windows: Query<&Window>) {
         width: Val::Vh(70.0),
         height: Val::Vh(30.0),
         anchor: Anchor::Center,
-        background: Color::rgb(0.1, 0.1, 0.1),
+        style: ItemStyle {
+            background: Color::rgb(0.1, 0.1, 0.1),
+            ..default()
+        },
         ..default()
     });
     let Ok(window) = windows.get_single() else {
@@ -63,8 +66,11 @@ fn update(mut pico: ResMut<Pico>, windows: Query<&Window>) {
                             y: Val::Percent(10.0),
                             width: Val::Percent(80.0),
                             height: Val::Percent(80.0),
-                            corner_radius: Val::Percent(10.0),
-                            background: color,
+                            style: ItemStyle {
+                                corner_radius: Val::Percent(10.0),
+                                background: color,
+                                ..default()
+                            },
                             anchor: Anchor::TopLeft,
                             anchor_parent: Anchor::TopLeft,
                             parent: Some(cell),
@@ -77,9 +83,12 @@ fn update(mut pico: ResMut<Pico>, windows: Query<&Window>) {
                                     y: Val::Px(cursor_position.y + 20.0),
                                     width: Val::Vh(20.0),
                                     height: Val::Vh(15.0),
-                                    background: color,
-                                    border_color: Color::WHITE,
-                                    border_width: Val::Px(1.0),
+                                    style: ItemStyle {
+                                        background: color,
+                                        border_color: Color::WHITE,
+                                        border_width: Val::Px(1.0),
+                                        ..default()
+                                    },
                                     anchor: Anchor::TopLeft,
                                     depth: Some(0.99),
                                     ..default()
@@ -89,13 +98,16 @@ fn update(mut pico: ResMut<Pico>, windows: Query<&Window>) {
                                     y: Val::Px(1.0),
                                     text: format!("{:#?}", color),
                                     anchor_parent: Anchor::Center,
-                                    text_alignment: TextAlignment::Left,
+                                    style: ItemStyle {
+                                        text_alignment: TextAlignment::Left,
+                                        color: Color::BLACK,
+                                        ..default()
+                                    },
                                     parent: Some(tooltip),
-                                    color: Color::BLACK,
                                     ..default()
                                 };
                                 pico.add(text.clone());
-                                text.color = Color::WHITE;
+                                text.style.color = Color::WHITE;
                                 text.x = Val::Px(0.0);
                                 text.y = Val::Px(0.0);
                                 pico.add(text.clone());

@@ -5,11 +5,11 @@ use bevy::{
     text::{BreakLineOn, Text2dBounds},
     utils::HashMap,
 };
-use core::hash::Hash;
 use core::hash::Hasher;
 use std::{collections::hash_map::DefaultHasher, f32::consts::PI};
 
 use crate::{
+    hash::hash_color,
     pico::{get_bbox, Drag, Pico, Pico2dCamera, StateItem},
     MeshHandles,
 };
@@ -163,10 +163,11 @@ pub fn render(
             true
         };
         if generate || pico.window_size != window_size {
-            let mut corner_radius = pico.valp_y(item.corner_radius, item.uv_size) * window_size.y;
+            let mut corner_radius =
+                pico.valp_y(item.style.corner_radius, item.uv_size) * window_size.y;
             let size = item.uv_size * window_size;
-            let font_size = pico.valp_y(item.font_size, item.uv_size) * window_size.y;
-            let border_width = pico.valp_y(item.border_width, item.uv_size) * window_size.y;
+            let font_size = pico.valp_y(item.style.font_size, item.uv_size) * window_size.y;
+            let border_width = pico.valp_y(item.style.border_width, item.uv_size) * window_size.y;
             let border_width_x2 = border_width * 2.0;
 
             corner_radius = corner_radius.min(size.x).min(size.y);
@@ -186,11 +187,11 @@ pub fn render(
                     item.text.clone(),
                     TextStyle {
                         font_size,
-                        color: item.color,
-                        font: item.font.clone(),
+                        color: item.style.color,
+                        font: item.style.font.clone(),
                     },
                 )],
-                alignment: item.text_alignment,
+                alignment: item.style.text_alignment,
                 linebreak_behavior: BreakLineOn::WordBoundary,
             };
             state_item.life = item.life;
@@ -208,14 +209,14 @@ pub fn render(
                     ..default()
                 });
 
-                let material_handle = cached_materials.get(item.background, &mut materials);
+                let material_handle = cached_materials.get(item.style.background, &mut materials);
                 let border_material_handle =
-                    cached_materials.get(item.border_color, &mut materials);
-                let using_border = item.border_color.a() > 0.0 && border_width > 0.0;
+                    cached_materials.get(item.style.border_color, &mut materials);
+                let using_border = item.style.border_color.a() > 0.0 && border_width > 0.0;
 
                 entity.with_children(|builder| {
                     let item_anchor_vec = item.anchor.as_vec();
-                    if item.background.a() > 0.0 {
+                    if item.style.background.a() > 0.0 {
                         let anchor_trans = (-item_anchor_vec * size).extend(0.0);
                         generate_rect_entities(
                             corner_radius,
@@ -245,9 +246,10 @@ pub fn render(
 
                     builder.spawn(Text2dBundle {
                         text,
-                        text_anchor: item.anchor_text.clone(),
+                        text_anchor: item.style.anchor_text.clone(),
                         transform: Transform::from_translation(
-                            (size * -(item_anchor_vec - item.anchor_text.as_vec())).extend(0.0001),
+                            (size * -(item_anchor_vec - item.style.anchor_text.as_vec()))
+                                .extend(0.0001),
                         ),
                         text_2d_bounds: Text2dBounds { size },
                         ..default()
@@ -270,7 +272,7 @@ pub fn render(
                         },
                         Text2dBundle {
                             text,
-                            text_anchor: item.anchor_text.clone(),
+                            text_anchor: item.style.anchor_text.clone(),
                             transform: Transform::from_translation(*item_pos),
                             ..default()
                         },
@@ -325,73 +327,6 @@ impl ColorMaterialCache {
             handle
         };
         material_handle
-    }
-}
-
-pub fn hash_color(color: &Color, hasher: &mut DefaultHasher) {
-    color.r().to_bits().hash(hasher);
-    color.g().to_bits().hash(hasher);
-    color.b().to_bits().hash(hasher);
-    color.a().to_bits().hash(hasher);
-}
-
-pub fn hash_vec2(v: &Vec2, hasher: &mut DefaultHasher) {
-    v.x.to_bits().hash(hasher);
-    v.y.to_bits().hash(hasher);
-}
-
-pub fn hash_vec3(v: &Vec3, hasher: &mut DefaultHasher) {
-    v.x.to_bits().hash(hasher);
-    v.y.to_bits().hash(hasher);
-    v.z.to_bits().hash(hasher);
-}
-
-pub fn hash_vec4(v: &Vec4, hasher: &mut DefaultHasher) {
-    v.x.to_bits().hash(hasher);
-    v.y.to_bits().hash(hasher);
-    v.z.to_bits().hash(hasher);
-    v.w.to_bits().hash(hasher);
-}
-
-pub fn hash_val(v: &Val, hasher: &mut DefaultHasher) {
-    match v {
-        Val::Auto => &0.0,
-        Val::Px(f) => f,
-        Val::Percent(f) => f,
-        Val::Vw(f) => f,
-        Val::Vh(f) => f,
-        Val::VMin(f) => f,
-        Val::VMax(f) => f,
-    }
-    .to_bits()
-    .hash(hasher);
-    match v {
-        Val::Auto => 0,
-        Val::Px(_) => 1,
-        Val::Percent(_) => 2,
-        Val::Vw(_) => 3,
-        Val::Vh(_) => 4,
-        Val::VMin(_) => 5,
-        Val::VMax(_) => 6,
-    }
-    .hash(hasher);
-}
-
-pub fn hash_anchor(anchor: &Anchor, hasher: &mut DefaultHasher) {
-    match anchor {
-        Anchor::Center => 0.hash(hasher),
-        Anchor::BottomLeft => 1.hash(hasher),
-        Anchor::BottomCenter => 2.hash(hasher),
-        Anchor::BottomRight => 3.hash(hasher),
-        Anchor::CenterLeft => 4.hash(hasher),
-        Anchor::CenterRight => 5.hash(hasher),
-        Anchor::TopLeft => 6.hash(hasher),
-        Anchor::TopCenter => 7.hash(hasher),
-        Anchor::TopRight => 8.hash(hasher),
-        Anchor::Custom(point) => {
-            point.x.to_bits().hash(hasher);
-            point.y.to_bits().hash(hasher);
-        }
     }
 }
 

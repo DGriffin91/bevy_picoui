@@ -11,7 +11,8 @@ use std::collections::hash_map::DefaultHasher;
 
 use crate::{
     guard::Guard,
-    renderer::{hash_anchor, hash_color, hash_val, hash_vec4, MAJOR_DEPTH_AUTO_STEP},
+    hash::{hash_anchor, hash_color, hash_val, hash_vec4},
+    renderer::MAJOR_DEPTH_AUTO_STEP,
 };
 
 #[derive(Clone, Copy, Debug, Hash)]
@@ -22,12 +23,59 @@ pub struct ItemIndex(pub usize);
 pub struct Pico2dCamera;
 
 #[derive(Clone, Debug)]
+pub struct ItemStyle {
+    // 50% will result in a circle
+    pub corner_radius: Val,
+    pub border_width: Val,
+    pub border_color: Color,
+    pub font_size: Val,
+    pub font: Handle<Font>,
+    pub color: Color,
+    pub background: Color,
+    pub anchor_text: Anchor,
+    pub text_alignment: TextAlignment,
+}
+
+impl Default for ItemStyle {
+    fn default() -> Self {
+        ItemStyle {
+            corner_radius: Val::default(),
+            border_width: Val::default(),
+            border_color: Color::BLACK,
+            font_size: Val::Vh(2.0),
+            font: DEFAULT_FONT_HANDLE.typed(),
+            color: Color::WHITE,
+            background: Color::NONE,
+            text_alignment: TextAlignment::Center,
+            anchor_text: Anchor::Center,
+        }
+    }
+}
+
+impl Hash for ItemStyle {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        hash_val(&self.corner_radius, state);
+        hash_val(&self.border_width, state);
+        hash_color(&self.border_color, state);
+        hash_val(&self.font_size, state);
+        self.font.hash(state);
+        hash_color(&self.color, state);
+        hash_color(&self.background, state);
+        self.text_alignment.hash(state);
+        hash_anchor(&self.anchor_text, state)
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct PicoItem {
     pub text: String,
     pub x: Val,
     pub y: Val,
     pub width: Val,
     pub height: Val,
+    pub style: ItemStyle,
+    pub anchor: Anchor,
+    pub anchor_parent: Anchor,
     /// uv position within window, is combined with x, y at pico.add(). Don't change after pico.add()
     pub uv_position: Vec2,
     /// uv size within window, is combined with width, height at pico.add(). Don't change after pico.add()
@@ -39,18 +87,6 @@ pub struct PicoItem {
     pub depth: Option<f32>,
     /// Max z position of immediate children, used for auto z
     pub child_max_depth: f32,
-    // 50% will result in a circle
-    pub corner_radius: Val,
-    pub border_width: Val,
-    pub border_color: Color,
-    pub font_size: Val,
-    pub font: Handle<Font>,
-    pub color: Color,
-    pub background: Color,
-    pub anchor: Anchor,
-    pub anchor_parent: Anchor,
-    pub anchor_text: Anchor,
-    pub text_alignment: TextAlignment,
     /// If life is 0.0, it will only live one frame (default), if life is f32::INFINITY it will live forever.
     pub life: f32,
     /// If the id changes, the item is re-rendered
@@ -71,23 +107,15 @@ impl Default for PicoItem {
             y: Val::default(),
             width: Val::default(),
             height: Val::default(),
+            style: ItemStyle::default(),
+            anchor: Anchor::Center,
+            anchor_parent: Anchor::TopLeft,
             uv_position: Vec2::ZERO,
             position_3d: None,
             depth: None,
             child_max_depth: 0.0,
-            corner_radius: Val::default(),
-            border_width: Val::default(),
-            border_color: Color::BLACK,
             uv_size: Vec2::ZERO,
             text: String::new(),
-            font_size: Val::Vh(2.0),
-            font: DEFAULT_FONT_HANDLE.typed(),
-            color: Color::WHITE,
-            background: Color::NONE,
-            text_alignment: TextAlignment::Center,
-            anchor_text: Anchor::Center,
-            anchor: Anchor::Center,
-            anchor_parent: Anchor::TopLeft,
             life: 0.0,
             id: None,
             spatial_id: None,
@@ -132,27 +160,20 @@ impl PicoItem {
         }
         hash_anchor(&self.anchor, hasher);
         hash_anchor(&self.anchor_parent, hasher);
-        hash_anchor(&self.anchor_text, hasher);
+        hash_anchor(&self.style.anchor_text, hasher);
         self.parent.hash(hasher);
         hasher.finish()
     }
     pub fn generate_id(&mut self) -> u64 {
         self.id = None;
-        let hasher = &mut DefaultHasher::new();
-        self.spatial_id.unwrap().hash(hasher);
-        hash_vec4(&self.computed_bbox.unwrap(), hasher);
-        self.depth.unwrap().to_bits().hash(hasher);
-        hash_color(&self.background, hasher);
-        hash_color(&self.border_color, hasher);
-        hash_color(&self.color, hasher);
-        hash_val(&self.corner_radius, hasher);
-        hash_val(&self.border_width, hasher);
-        hash_val(&self.font_size, hasher);
-        self.text.hash(hasher);
-        self.font.hash(hasher);
-        self.text_alignment.hash(hasher);
-        self.life.to_bits().hash(hasher);
-        hasher.finish()
+        let state = &mut DefaultHasher::new();
+        self.spatial_id.unwrap().hash(state);
+        hash_vec4(&self.computed_bbox.unwrap(), state);
+        self.depth.unwrap().to_bits().hash(state);
+        self.text.hash(state);
+        self.life.to_bits().hash(state);
+        self.style.hash(state);
+        state.finish()
     }
 }
 

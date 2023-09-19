@@ -2,7 +2,7 @@ use bevy::{math::*, prelude::*, sprite::Anchor};
 
 use bevy_picoui::{
     palette::RGB_PALETTE,
-    pico::{Pico, Pico2dCamera, PicoItem},
+    pico::{ItemStyle, Pico, Pico2dCamera, PicoItem},
     PicoPlugin,
 };
 
@@ -30,12 +30,15 @@ fn update(mut pico: ResMut<Pico>, mut position: Local<Option<Vec2>>) {
         depth: Some(0.01),
         width: Val::VMin(50.0),
         height: Val::VMin(50.0),
-        corner_radius: Val::Vh(3.0),
-        border_width: Val::Px(1.0),
-        border_color: Color::WHITE,
+        style: ItemStyle {
+            corner_radius: Val::Vh(3.0),
+            border_width: Val::Px(1.0),
+            border_color: Color::WHITE,
+            background: Color::WHITE * 0.2,
+            ..default()
+        },
         anchor: Anchor::Center,
         anchor_parent: Anchor::Center,
-        background: Color::WHITE * 0.2,
         ..default()
     });
 
@@ -63,10 +66,13 @@ fn update(mut pico: ResMut<Pico>, mut position: Local<Option<Vec2>>) {
         y: Val::Vh(position.y * 100.0),
         width: radius * 2.0,
         height: radius * 2.0,
-        corner_radius: Val::Vh(3.0),
-        border_width: Val::Vh(0.1),
-        border_color: Color::WHITE,
-        background: RGB_PALETTE[2][3],
+        style: ItemStyle {
+            corner_radius: Val::Vh(3.0),
+            border_width: Val::Vh(0.1),
+            border_color: Color::WHITE,
+            background: RGB_PALETTE[2][3],
+            ..default()
+        },
         parent: Some(main_box),
         anchor: Anchor::Center,
         anchor_parent: Anchor::Center,

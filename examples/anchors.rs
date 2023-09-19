@@ -2,7 +2,7 @@ use bevy::{prelude::*, sprite::Anchor};
 
 use bevy_picoui::{
     palette::RGB_PALETTE,
-    pico::{Pico, Pico2dCamera, PicoItem},
+    pico::{ItemStyle, Pico, Pico2dCamera, PicoItem},
     PicoPlugin,
 };
 
@@ -27,12 +27,15 @@ fn update(mut pico: ResMut<Pico>) {
         y: Val::Px(0.0),
         width: Val::VMin(50.0),
         height: Val::VMin(50.0),
-        corner_radius: Val::Percent(4.0),
-        border_width: Val::Px(1.0),
-        border_color: Color::WHITE,
+        style: ItemStyle {
+            corner_radius: Val::Percent(4.0),
+            border_width: Val::Px(1.0),
+            border_color: Color::WHITE,
+            background: Color::WHITE * 0.1,
+            ..default()
+        },
         anchor: Anchor::Center,
         anchor_parent: Anchor::Center,
-        background: Color::WHITE * 0.1,
         ..default()
     });
 
@@ -55,12 +58,15 @@ fn update(mut pico: ResMut<Pico>) {
             y: Val::Px(8.0 * center_anchor.y),
             width: Val::Px(48.0),
             height: Val::Px(48.0),
-            corner_radius: Val::Px(4.0),
-            border_width: Val::Px(1.0),
-            border_color: Color::WHITE,
+            style: ItemStyle {
+                corner_radius: Val::Px(4.0),
+                border_width: Val::Px(1.0),
+                border_color: Color::WHITE,
+                background: RGB_PALETTE[0][0],
+                ..default()
+            },
             anchor: parent_anchor.clone(),
             anchor_parent: parent_anchor.clone(),
-            background: RGB_PALETTE[0][0],
             parent: Some(main_box),
             ..default()
         });
@@ -68,11 +74,14 @@ fn update(mut pico: ResMut<Pico>) {
             depth: Some(0.9),
             width: Val::Px(16.0),
             height: Val::Px(16.0),
-            corner_radius: Val::Px(4.0),
-            border_width: Val::Px(1.0),
-            border_color: Color::WHITE,
+            style: ItemStyle {
+                corner_radius: Val::Px(4.0),
+                border_width: Val::Px(1.0),
+                border_color: Color::WHITE,
+                background: RGB_PALETTE[0][2],
+                ..default()
+            },
             anchor_parent: parent_anchor.clone(),
-            background: RGB_PALETTE[0][2],
             parent: Some(main_box),
             ..default()
         });

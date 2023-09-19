@@ -4,7 +4,7 @@ use bevy::{math::*, prelude::*, sprite::Anchor};
 
 use bevy_picoui::{
     palette::RGB_PALETTE,
-    pico::{Pico, Pico2dCamera, PicoItem},
+    pico::{ItemStyle, Pico, Pico2dCamera, PicoItem},
     widgets::drag_value,
     PicoPlugin,
 };
@@ -45,12 +45,15 @@ fn update(
         y: Val::Percent(0.0),
         width: Val::VMin(50.0),
         height: Val::VMin(50.0),
-        corner_radius: Val::Px(10.0),
-        border_width: Val::Px(1.0),
-        border_color: Color::WHITE,
+        style: ItemStyle {
+            corner_radius: Val::Px(10.0),
+            border_width: Val::Px(1.0),
+            border_color: Color::WHITE,
+            background: RGB_PALETTE[1][0],
+            ..default()
+        },
         anchor: Anchor::Center,
         anchor_parent: Anchor::Center,
-        background: RGB_PALETTE[1][0],
         ..default()
     });
     let mut points = Vec::new();

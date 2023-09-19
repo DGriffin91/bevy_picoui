@@ -9,6 +9,7 @@ use std::f32::consts::FRAC_PI_2;
 
 pub mod arc_mesh;
 pub mod guard;
+pub mod hash;
 pub mod palette;
 pub mod pico;
 pub mod renderer;
