@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use bevy::{asset::ChangeWatcher, math::*, prelude::*, sprite::Anchor};
+use bevy::{math::*, prelude::*, sprite::Anchor};
 
 use bevy_picoui::{
     palette::RGB_PALETTE,
@@ -11,10 +9,7 @@ use bevy_picoui::{
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
-        .add_plugins(DefaultPlugins.set(AssetPlugin {
-            watch_for_changes: ChangeWatcher::with_delay(Duration::from_millis(200)),
-            ..default()
-        }))
+        .add_plugins(DefaultPlugins)
         .add_plugins(PicoPlugin::default())
         .add_systems(Startup, setup)
         .add_systems(Update, update)

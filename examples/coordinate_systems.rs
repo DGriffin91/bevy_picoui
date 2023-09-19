@@ -1,7 +1,4 @@
-use std::time::Duration;
-
 use bevy::{
-    asset::ChangeWatcher,
     math::*,
     prelude::*,
     render::{
@@ -29,10 +26,7 @@ fn get_default_cam_trans() -> Transform {
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
-        .add_plugins(DefaultPlugins.set(AssetPlugin {
-            watch_for_changes: ChangeWatcher::with_delay(Duration::from_millis(200)),
-            ..default()
-        }))
+        .add_plugins(DefaultPlugins)
         .insert_resource(GizmoConfig {
             render_layers: RenderLayers::layer(1),
             ..default()
