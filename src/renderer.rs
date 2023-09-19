@@ -314,10 +314,7 @@ impl ColorMaterialCache {
         materials: &mut Assets<ColorMaterial>,
     ) -> Handle<ColorMaterial> {
         let hasher = &mut DefaultHasher::new();
-        color.r().to_bits().hash(hasher);
-        color.g().to_bits().hash(hasher);
-        color.b().to_bits().hash(hasher);
-        color.a().to_bits().hash(hasher);
+        hash_color(&color, hasher);
         let mat_hash = hasher.finish();
 
         let material_handle = if let Some(handle) = self.0.get(&mat_hash) {
@@ -328,6 +325,73 @@ impl ColorMaterialCache {
             handle
         };
         material_handle
+    }
+}
+
+pub fn hash_color(color: &Color, hasher: &mut DefaultHasher) {
+    color.r().to_bits().hash(hasher);
+    color.g().to_bits().hash(hasher);
+    color.b().to_bits().hash(hasher);
+    color.a().to_bits().hash(hasher);
+}
+
+pub fn hash_vec2(v: &Vec2, hasher: &mut DefaultHasher) {
+    v.x.to_bits().hash(hasher);
+    v.y.to_bits().hash(hasher);
+}
+
+pub fn hash_vec3(v: &Vec3, hasher: &mut DefaultHasher) {
+    v.x.to_bits().hash(hasher);
+    v.y.to_bits().hash(hasher);
+    v.z.to_bits().hash(hasher);
+}
+
+pub fn hash_vec4(v: &Vec4, hasher: &mut DefaultHasher) {
+    v.x.to_bits().hash(hasher);
+    v.y.to_bits().hash(hasher);
+    v.z.to_bits().hash(hasher);
+    v.w.to_bits().hash(hasher);
+}
+
+pub fn hash_val(v: &Val, hasher: &mut DefaultHasher) {
+    match v {
+        Val::Auto => &0.0,
+        Val::Px(f) => f,
+        Val::Percent(f) => f,
+        Val::Vw(f) => f,
+        Val::Vh(f) => f,
+        Val::VMin(f) => f,
+        Val::VMax(f) => f,
+    }
+    .to_bits()
+    .hash(hasher);
+    match v {
+        Val::Auto => 0,
+        Val::Px(_) => 1,
+        Val::Percent(_) => 2,
+        Val::Vw(_) => 3,
+        Val::Vh(_) => 4,
+        Val::VMin(_) => 5,
+        Val::VMax(_) => 6,
+    }
+    .hash(hasher);
+}
+
+pub fn hash_anchor(anchor: &Anchor, hasher: &mut DefaultHasher) {
+    match anchor {
+        Anchor::Center => 0.hash(hasher),
+        Anchor::BottomLeft => 1.hash(hasher),
+        Anchor::BottomCenter => 2.hash(hasher),
+        Anchor::BottomRight => 3.hash(hasher),
+        Anchor::CenterLeft => 4.hash(hasher),
+        Anchor::CenterRight => 5.hash(hasher),
+        Anchor::TopLeft => 6.hash(hasher),
+        Anchor::TopCenter => 7.hash(hasher),
+        Anchor::TopRight => 8.hash(hasher),
+        Anchor::Custom(point) => {
+            point.x.to_bits().hash(hasher);
+            point.y.to_bits().hash(hasher);
+        }
     }
 }
 

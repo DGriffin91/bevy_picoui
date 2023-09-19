@@ -9,9 +9,12 @@ use core::hash::Hash;
 use core::hash::Hasher;
 use std::collections::hash_map::DefaultHasher;
 
-use crate::{guard::Guard, renderer::MAJOR_DEPTH_AUTO_STEP};
+use crate::{
+    guard::Guard,
+    renderer::{hash_anchor, hash_color, hash_val, hash_vec4, MAJOR_DEPTH_AUTO_STEP},
+};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub struct ItemIndex(pub usize);
 
 // Only supports one camera.
@@ -127,15 +130,28 @@ impl PicoItem {
             position_3d.y.to_bits().hash(hasher);
             position_3d.z.to_bits().hash(hasher);
         }
-        format!("{:?}", self.anchor).hash(hasher);
-        format!("{:?}", self.anchor_parent).hash(hasher);
-        format!("{:?}", self.anchor_text).hash(hasher);
+        hash_anchor(&self.anchor, hasher);
+        hash_anchor(&self.anchor_parent, hasher);
+        hash_anchor(&self.anchor_text, hasher);
+        self.parent.hash(hasher);
         hasher.finish()
     }
     pub fn generate_id(&mut self) -> u64 {
         self.id = None;
         let hasher = &mut DefaultHasher::new();
-        format!("{:?}", self).hash(hasher);
+        self.spatial_id.unwrap().hash(hasher);
+        hash_vec4(&self.computed_bbox.unwrap(), hasher);
+        self.depth.unwrap().to_bits().hash(hasher);
+        hash_color(&self.background, hasher);
+        hash_color(&self.border_color, hasher);
+        hash_color(&self.color, hasher);
+        hash_val(&self.corner_radius, hasher);
+        hash_val(&self.border_width, hasher);
+        hash_val(&self.font_size, hasher);
+        self.text.hash(hasher);
+        self.font.hash(hasher);
+        self.text_alignment.hash(hasher);
+        self.life.to_bits().hash(hasher);
         hasher.finish()
     }
 }
