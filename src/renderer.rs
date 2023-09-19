@@ -1,7 +1,7 @@
 use bevy::{
     math::{vec2, vec3, Vec3Swizzles, Vec4Swizzles},
     prelude::*,
-    sprite::{Anchor, MaterialMesh2dBundle},
+    sprite::{Anchor, MaterialMesh2dBundle, Mesh2dHandle},
     text::{BreakLineOn, Text2dBounds},
     utils::HashMap,
 };
@@ -407,7 +407,7 @@ fn generate_rect_entities(
     let anchor_trans = anchor_trans + vec3(0.0, 0.0, depth_bias);
     if corner_radius <= 0.0 {
         builder.spawn(MaterialMesh2dBundle {
-            mesh: mesh_handles.rect.clone(),
+            mesh: Mesh2dHandle(mesh_handles.rect.clone_weak()),
             material: material_handle.clone(),
             transform: Transform::from_translation(anchor_trans).with_scale(size.extend(1.0)),
             ..default()
@@ -418,7 +418,7 @@ fn generate_rect_entities(
         if corner_radius < size.x && corner_radius < size.y {
             // Make cross shape with gaps for the arcs
             builder.spawn(MaterialMesh2dBundle {
-                mesh: mesh_handles.rect.clone(),
+                mesh: Mesh2dHandle(mesh_handles.rect.clone_weak()),
                 material: material_handle.clone(),
                 transform: Transform::from_translation(anchor_trans)
                     .with_scale((size - vec2(cr2, 0.0)).extend(1.0)),
@@ -429,14 +429,14 @@ fn generate_rect_entities(
                 let s = vec2(corner_radius, size.y - cr2).extend(1.0);
                 let off = vec3((size.x - corner_radius) * 0.5, 0.0, 0.0);
                 builder.spawn(MaterialMesh2dBundle {
-                    mesh: mesh_handles.rect.clone(),
-                    material: material_handle.clone(),
+                    mesh: Mesh2dHandle(mesh_handles.rect.clone_weak()),
+                    material: material_handle.clone_weak(),
                     transform: Transform::from_translation(anchor_trans + off).with_scale(s),
                     ..default()
                 });
                 builder.spawn(MaterialMesh2dBundle {
-                    mesh: mesh_handles.rect.clone(),
-                    material: material_handle.clone(),
+                    mesh: Mesh2dHandle(mesh_handles.rect.clone_weak()),
+                    material: material_handle.clone_weak(),
                     transform: Transform::from_translation(anchor_trans - off).with_scale(s),
                     ..default()
                 });
@@ -451,8 +451,8 @@ fn generate_rect_entities(
         ] {
             let offset = offset + corner_radius;
             builder.spawn(MaterialMesh2dBundle {
-                mesh: mesh_handles.circle.clone(),
-                material: material_handle.clone(),
+                mesh: Mesh2dHandle(mesh_handles.circle.clone_weak()),
+                material: material_handle.clone_weak(),
                 transform: Transform::from_translation(
                     (anchor_trans.xy() + offset - size * 0.5)
                         .extend(MINOR_DEPTH_AUTO_STEP + depth_bias),
