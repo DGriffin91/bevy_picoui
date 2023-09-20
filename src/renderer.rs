@@ -11,7 +11,7 @@ use std::{collections::hash_map::DefaultHasher, f32::consts::PI};
 use crate::{
     hash::hash_color,
     pico::{get_bbox, Drag, Pico, Pico2dCamera, StateItem},
-    MeshHandles,
+    MeshHandles, SwapMaterialEntity,
 };
 
 #[derive(Component)]
@@ -214,7 +214,7 @@ pub fn render(
 
                 entity.with_children(|builder| {
                     let item_anchor_vec = item.get_anchor().as_vec();
-                    if item.style.background_color.a() > 0.0 {
+                    if item.style.background_color.a() > 0.0 || item.style.material.is_some() {
                         let anchor_trans = (-item_anchor_vec * size).extend(0.0);
                         generate_rect_entities(
                             corner_radius,
@@ -228,6 +228,7 @@ pub fn render(
                             anchor_trans,
                             size,
                             0.0,
+                            item.style.material,
                         );
                         if using_border && border_width_x2 < size.x && border_width_x2 < size.y {
                             generate_rect_entities(
@@ -238,6 +239,7 @@ pub fn render(
                                 anchor_trans,
                                 size - Vec2::splat(border_width_x2),
                                 MINOR_DEPTH_AUTO_STEP,
+                                item.style.material,
                             );
                         }
                     }
@@ -336,43 +338,56 @@ fn generate_rect_entities(
     anchor_trans: Vec3,
     size: Vec2,
     depth_bias: f32,
+    material: Option<Entity>,
 ) {
     let anchor_trans = anchor_trans + vec3(0.0, 0.0, depth_bias);
     if corner_radius <= 0.0 {
-        builder.spawn(MaterialMesh2dBundle {
+        let mut entity = builder.spawn(MaterialMesh2dBundle {
             mesh: Mesh2dHandle(mesh_handles.rect.clone_weak()),
             material: material_handle.clone(),
             transform: Transform::from_translation(anchor_trans).with_scale(size.extend(1.0)),
             ..default()
         });
+        if let Some(material) = material {
+            entity.insert(SwapMaterialEntity(material));
+        }
     } else {
         let cr2 = corner_radius * 2.0;
         // Don't bother making rectangles if corner_radius just results in circle
         if corner_radius < size.x && corner_radius < size.y {
             // Make cross shape with gaps for the arcs
-            builder.spawn(MaterialMesh2dBundle {
+            let mut entity = builder.spawn(MaterialMesh2dBundle {
                 mesh: Mesh2dHandle(mesh_handles.rect.clone_weak()),
                 material: material_handle.clone(),
                 transform: Transform::from_translation(anchor_trans)
                     .with_scale((size - vec2(cr2, 0.0)).extend(1.0)),
                 ..default()
             });
+            if let Some(material) = material {
+                entity.insert(SwapMaterialEntity(material));
+            }
             // Don't bother making side rectangles if corner_radius just results in half circles on the ends
             if corner_radius < size.y {
                 let s = vec2(corner_radius, size.y - cr2).extend(1.0);
                 let off = vec3((size.x - corner_radius) * 0.5, 0.0, 0.0);
-                builder.spawn(MaterialMesh2dBundle {
+                let mut entity = builder.spawn(MaterialMesh2dBundle {
                     mesh: Mesh2dHandle(mesh_handles.rect.clone_weak()),
                     material: material_handle.clone_weak(),
                     transform: Transform::from_translation(anchor_trans + off).with_scale(s),
                     ..default()
                 });
-                builder.spawn(MaterialMesh2dBundle {
+                if let Some(material) = material {
+                    entity.insert(SwapMaterialEntity(material));
+                }
+                let mut entity = builder.spawn(MaterialMesh2dBundle {
                     mesh: Mesh2dHandle(mesh_handles.rect.clone_weak()),
                     material: material_handle.clone_weak(),
                     transform: Transform::from_translation(anchor_trans - off).with_scale(s),
                     ..default()
                 });
+                if let Some(material) = material {
+                    entity.insert(SwapMaterialEntity(material));
+                }
             }
         }
         // Add arcs for corners
@@ -383,7 +398,7 @@ fn generate_rect_entities(
             (vec2(size.x - cr2, 0.0), PI * 1.5),
         ] {
             let offset = offset + corner_radius;
-            builder.spawn(MaterialMesh2dBundle {
+            let mut entity = builder.spawn(MaterialMesh2dBundle {
                 mesh: Mesh2dHandle(mesh_handles.circle.clone_weak()),
                 material: material_handle.clone_weak(),
                 transform: Transform::from_translation(
@@ -394,6 +409,9 @@ fn generate_rect_entities(
                 .with_rotation(Quat::from_rotation_z(angle)),
                 ..default()
             });
+            if let Some(material) = material {
+                entity.insert(SwapMaterialEntity(material));
+            }
         }
     }
 }

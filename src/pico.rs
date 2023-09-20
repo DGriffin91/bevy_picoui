@@ -1,7 +1,8 @@
 use bevy::{
+    ecs::system::SystemParam,
     math::{vec2, vec4, Vec4Swizzles},
     prelude::*,
-    sprite::Anchor,
+    sprite::{Anchor, Material2d},
     text::DEFAULT_FONT_HANDLE,
     utils::HashMap,
 };
@@ -22,6 +23,9 @@ pub struct ItemIndex(pub usize);
 #[derive(Component)]
 pub struct Pico2dCamera;
 
+#[derive(Component, Clone, Debug)]
+pub struct MaterialHandleEntity<M: Material2d>(pub Handle<M>);
+
 #[derive(Clone, Debug)]
 pub struct ItemStyle {
     // 50% will result in a circle
@@ -34,6 +38,7 @@ pub struct ItemStyle {
     pub background_color: Color,
     pub anchor_text: Anchor,
     pub text_alignment: TextAlignment,
+    pub material: Option<Entity>,
 }
 
 impl Default for ItemStyle {
@@ -48,7 +53,35 @@ impl Default for ItemStyle {
             background_color: Color::NONE,
             text_alignment: TextAlignment::Center,
             anchor_text: Anchor::Center,
+            material: None,
         }
+    }
+}
+
+#[derive(SystemParam)]
+pub struct PicoMaterials<'w, 's, M: Material2d> {
+    q: Query<'w, 's, (Entity, &'static MaterialHandleEntity<M>)>,
+}
+
+impl ItemStyle {
+    pub fn set_custom_material<M: Material2d>(
+        mut self,
+        commands: &mut Commands,
+        material_handle: &Handle<M>,
+        query: PicoMaterials<M>,
+    ) -> Self {
+        for (entity, handle) in &query.q {
+            if material_handle.id() == handle.0.id() {
+                self.material = Some(entity);
+                return self;
+            }
+        }
+        self.material = Some(
+            commands
+                .spawn(MaterialHandleEntity(material_handle.clone()))
+                .id(),
+        );
+        self
     }
 }
 
@@ -62,7 +95,10 @@ impl Hash for ItemStyle {
         hash_color(&self.text_color, state);
         hash_color(&self.background_color, state);
         self.text_alignment.hash(state);
-        hash_anchor(&self.anchor_text, state)
+        hash_anchor(&self.anchor_text, state);
+        if let Some(entity) = self.material {
+            entity.hash(state);
+        }
     }
 }
 
