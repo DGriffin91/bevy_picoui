@@ -28,7 +28,7 @@ fn update(mut pico: ResMut<Pico>, windows: Query<&Window>) {
         height: Val::Vh(30.0),
         anchor: Anchor::Center,
         style: ItemStyle {
-            background: Color::rgb(0.1, 0.1, 0.1),
+            background_color: Color::rgb(0.1, 0.1, 0.1),
             ..default()
         },
         ..default()
@@ -68,7 +68,7 @@ fn update(mut pico: ResMut<Pico>, windows: Query<&Window>) {
                             height: Val::Percent(80.0),
                             style: ItemStyle {
                                 corner_radius: Val::Percent(10.0),
-                                background: color,
+                                background_color: color,
                                 ..default()
                             },
                             anchor: Anchor::TopLeft,
@@ -84,7 +84,7 @@ fn update(mut pico: ResMut<Pico>, windows: Query<&Window>) {
                                     width: Val::Vh(20.0),
                                     height: Val::Vh(15.0),
                                     style: ItemStyle {
-                                        background: color,
+                                        background_color: color,
                                         border_color: Color::WHITE,
                                         border_width: Val::Px(1.0),
                                         ..default()
@@ -100,14 +100,14 @@ fn update(mut pico: ResMut<Pico>, windows: Query<&Window>) {
                                     anchor_parent: Anchor::Center,
                                     style: ItemStyle {
                                         text_alignment: TextAlignment::Left,
-                                        color: Color::BLACK,
+                                        text_color: Color::BLACK,
                                         ..default()
                                     },
                                     parent: Some(tooltip),
                                     ..default()
                                 };
                                 pico.add(text.clone());
-                                text.style.color = Color::WHITE;
+                                text.style.text_color = Color::WHITE;
                                 text.x = Val::Px(0.0);
                                 text.y = Val::Px(0.0);
                                 pico.add(text.clone());

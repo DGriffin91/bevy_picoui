@@ -29,7 +29,7 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
         height: Val::Vh(50.0),
         anchor: Anchor::Center,
         style: ItemStyle {
-            background: Color::WHITE * 0.2,
+            background_color: Color::WHITE * 0.2,
             ..default()
         },
         ..default()
@@ -43,7 +43,7 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
                 width: Val::Percent(100.0),
                 height: Val::Percent(9.0),
                 style: ItemStyle {
-                    background: RGB_PALETTE[1][1],
+                    background_color: RGB_PALETTE[1][1],
                     ..default()
                 },
                 anchor: Anchor::TopLeft,
@@ -61,7 +61,7 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
                             height: Val::Percent(80.0),
                             style: ItemStyle {
                                 corner_radius: Val::Percent(50.0),
-                                background: RGB_PALETTE[1][4],
+                                background_color: RGB_PALETTE[1][4],
                                 ..default()
                             },
                             anchor: Anchor::CenterLeft,

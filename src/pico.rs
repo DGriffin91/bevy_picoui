@@ -30,8 +30,8 @@ pub struct ItemStyle {
     pub border_color: Color,
     pub font_size: Val,
     pub font: Handle<Font>,
-    pub color: Color,
-    pub background: Color,
+    pub text_color: Color,
+    pub background_color: Color,
     pub anchor_text: Anchor,
     pub text_alignment: TextAlignment,
 }
@@ -44,8 +44,8 @@ impl Default for ItemStyle {
             border_color: Color::BLACK,
             font_size: Val::Vh(2.0),
             font: DEFAULT_FONT_HANDLE.typed(),
-            color: Color::WHITE,
-            background: Color::NONE,
+            text_color: Color::WHITE,
+            background_color: Color::NONE,
             text_alignment: TextAlignment::Center,
             anchor_text: Anchor::Center,
         }
@@ -59,8 +59,8 @@ impl Hash for ItemStyle {
         hash_color(&self.border_color, state);
         hash_val(&self.font_size, state);
         self.font.hash(state);
-        hash_color(&self.color, state);
-        hash_color(&self.background, state);
+        hash_color(&self.text_color, state);
+        hash_color(&self.background_color, state);
         self.text_alignment.hash(state);
         hash_anchor(&self.anchor_text, state)
     }

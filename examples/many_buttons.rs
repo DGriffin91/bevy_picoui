@@ -110,7 +110,7 @@ fn spawn_button(
         height: Val::Percent(width),
         anchor: Anchor::Center,
         style: ItemStyle {
-            background: background_color,
+            background_color,
             border_color,
             border_width: border,
             font_size: Val::Px(FONT_SIZE),
@@ -122,7 +122,7 @@ fn spawn_button(
     let hovered = pico.hovered(&btn_index);
     let btn = pico.get_mut(&btn_index);
     if hovered {
-        btn.style.background = Color::ORANGE_RED;
+        btn.style.background_color = Color::ORANGE_RED;
     }
     if spawn_text {
         btn.text = format!("{i}, {j}");

@@ -31,7 +31,7 @@ fn update(mut pico: ResMut<Pico>) {
             corner_radius: Val::Percent(4.0),
             border_width: Val::Px(1.0),
             border_color: Color::WHITE,
-            background: Color::WHITE * 0.1,
+            background_color: Color::WHITE * 0.1,
             ..default()
         },
         anchor: Anchor::Center,
@@ -62,7 +62,7 @@ fn update(mut pico: ResMut<Pico>) {
                 corner_radius: Val::Px(4.0),
                 border_width: Val::Px(1.0),
                 border_color: Color::WHITE,
-                background: RGB_PALETTE[0][0],
+                background_color: RGB_PALETTE[0][0],
                 ..default()
             },
             anchor: parent_anchor.clone(),
@@ -78,7 +78,7 @@ fn update(mut pico: ResMut<Pico>) {
                 corner_radius: Val::Px(4.0),
                 border_width: Val::Px(1.0),
                 border_color: Color::WHITE,
-                background: RGB_PALETTE[0][2],
+                background_color: RGB_PALETTE[0][2],
                 ..default()
             },
             anchor_parent: parent_anchor.clone(),

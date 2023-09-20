@@ -188,7 +188,7 @@ fn update(
         style: ItemStyle {
             anchor_text: Anchor::BottomRight,
             text_alignment: TextAlignment::Right,
-            background: Color::rgba(0.0, 0.0, 0.0, 0.3),
+            background_color: Color::rgba(0.0, 0.0, 0.0, 0.3),
             ..default()
         },
         x: Val::Vh(1.0),
@@ -210,7 +210,7 @@ fn update(
         anchor: Anchor::TopLeft,
         style: ItemStyle {
             text_alignment: TextAlignment::Left,
-            background: Color::rgba(0.2, 0.2, 0.2, 0.2),
+            background_color: Color::rgba(0.2, 0.2, 0.2, 0.2),
             ..default()
         },
         ..default()
@@ -283,7 +283,7 @@ fn update(
                 height: Val::Vh(4.0),
                 style: ItemStyle {
                     corner_radius: Val::Percent(10.0),
-                    background: DARK_GRAY,
+                    background_color: DARK_GRAY,
                     ..default()
                 },
                 anchor: Anchor::TopCenter,
@@ -306,7 +306,7 @@ fn update(
             height: Val::Vh(2.0),
             style: ItemStyle {
                 corner_radius: Val::Percent(20.0),
-                background: Color::rgba(0.0, 0.0, 0.0, 0.3),
+                background_color: Color::rgba(0.0, 0.0, 0.0, 0.3),
                 ..default()
             },
             text: s.to_string(),

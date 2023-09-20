@@ -49,7 +49,7 @@ fn update(
             corner_radius: Val::Px(10.0),
             border_width: Val::Px(1.0),
             border_color: Color::WHITE,
-            background: RGB_PALETTE[1][0],
+            background_color: RGB_PALETTE[1][0],
             ..default()
         },
         anchor: Anchor::Center,

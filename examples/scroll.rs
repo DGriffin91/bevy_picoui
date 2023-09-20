@@ -33,7 +33,7 @@ fn update(mut pico: ResMut<Pico>, mut mouse_wheel_events: EventReader<MouseWheel
         anchor: Anchor::Center,
         anchor_parent: Anchor::Center,
         style: ItemStyle {
-            background: Color::rgb(0.1, 0.1, 0.1),
+            background_color: Color::rgb(0.1, 0.1, 0.1),
             ..default()
         },
         ..default()
@@ -52,7 +52,7 @@ fn update(mut pico: ResMut<Pico>, mut mouse_wheel_events: EventReader<MouseWheel
 
     pico.get_mut(&scroll.handle).style = ItemStyle {
         corner_radius: Val::Percent(25.0),
-        background: Color::rgb(0.4, 0.4, 0.4),
+        background_color: Color::rgb(0.4, 0.4, 0.4),
         ..default()
     };
 
@@ -64,6 +64,6 @@ fn update(mut pico: ResMut<Pico>, mut mouse_wheel_events: EventReader<MouseWheel
         let item = pico.get_mut(index);
         let color = RGB_PALETTE[i][j];
         item.style.corner_radius = Val::Percent(30.0);
-        item.style.background = color;
+        item.style.background_color = color;
     }
 }

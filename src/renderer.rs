@@ -184,7 +184,7 @@ pub fn render(
                     item.text.clone(),
                     TextStyle {
                         font_size,
-                        color: item.style.color,
+                        color: item.style.text_color,
                         font: item.style.font.clone(),
                     },
                 )],
@@ -206,14 +206,15 @@ pub fn render(
                     ..default()
                 });
 
-                let material_handle = cached_materials.get(item.style.background, &mut materials);
+                let material_handle =
+                    cached_materials.get(item.style.background_color, &mut materials);
                 let border_material_handle =
                     cached_materials.get(item.style.border_color, &mut materials);
                 let using_border = item.style.border_color.a() > 0.0 && border_width > 0.0;
 
                 entity.with_children(|builder| {
                     let item_anchor_vec = item.get_anchor().as_vec();
-                    if item.style.background.a() > 0.0 {
+                    if item.style.background_color.a() > 0.0 {
                         let anchor_trans = (-item_anchor_vec * size).extend(0.0);
                         generate_rect_entities(
                             corner_radius,

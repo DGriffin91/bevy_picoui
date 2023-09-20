@@ -98,7 +98,7 @@ fn update(mut gizmos: Gizmos, mut pico: ResMut<Pico>) {
         position_3d: Some(Vec3::Y * 1.1),
         uv_size: vec2(0.02, 0.02),
         style: ItemStyle {
-            background: Color::rgba(0.1, 0.1, 0.1, 0.5),
+            background_color: Color::rgba(0.1, 0.1, 0.1, 0.5),
             ..default()
         },
         text: String::from("Y+"),
@@ -107,7 +107,7 @@ fn update(mut gizmos: Gizmos, mut pico: ResMut<Pico>) {
     });
     if pico.hovered(&axis_text_index) {
         // Make axis text more opaque
-        pico.get_mut(&axis_text_index).style.background = Color::rgba(0.1, 0.1, 0.1, 0.8);
+        pico.get_mut(&axis_text_index).style.background_color = Color::rgba(0.1, 0.1, 0.1, 0.8);
 
         // Get 2d bounding box of axis text
         let state = pico.get_state(&axis_text_index).unwrap();
@@ -118,7 +118,7 @@ fn update(mut gizmos: Gizmos, mut pico: ResMut<Pico>) {
             uv_position: position,
             uv_size: vec2(0.1, 0.02),
             style: ItemStyle {
-                background: Color::rgba(0.1, 0.1, 0.1, 0.8),
+                background_color: Color::rgba(0.1, 0.1, 0.1, 0.8),
                 ..default()
             },
             text: String::from("HELLO WORLD"),

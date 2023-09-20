@@ -34,7 +34,7 @@ fn update(mut pico: ResMut<Pico>, mut position: Local<Option<Vec2>>) {
             corner_radius: Val::Vh(3.0),
             border_width: Val::Px(1.0),
             border_color: Color::WHITE,
-            background: Color::WHITE * 0.2,
+            background_color: Color::WHITE * 0.2,
             ..default()
         },
         anchor: Anchor::Center,
@@ -70,7 +70,7 @@ fn update(mut pico: ResMut<Pico>, mut position: Local<Option<Vec2>>) {
             corner_radius: Val::Vh(3.0),
             border_width: Val::Vh(0.1),
             border_color: Color::WHITE,
-            background: RGB_PALETTE[2][3],
+            background_color: RGB_PALETTE[2][3],
             ..default()
         },
         parent: Some(main_box),

@@ -16,8 +16,8 @@ use crate::{
 
 pub fn button(pico: &mut Pico, item: PicoItem) -> ItemIndex {
     let index = pico.add(item);
-    let c = pico.get(&index).style.background;
-    pico.get_mut(&index).style.background = if pico.hovered(&index) {
+    let c = pico.get(&index).style.background_color;
+    pico.get_mut(&index).style.background_color = if pico.hovered(&index) {
         c + Vec4::splat(0.06)
     } else {
         c
@@ -36,14 +36,14 @@ pub fn toggle_button(
     toggle_state: &mut bool,
 ) -> ItemIndex {
     let index = pico.add(item);
-    let mut c = pico.get(&index).style.background;
+    let mut c = pico.get(&index).style.background_color;
     if pico.clicked(&index) {
         *toggle_state = !*toggle_state;
     }
     if *toggle_state {
         c = enabled_bg;
     }
-    pico.get_mut(&index).style.background = if pico.hovered(&index) {
+    pico.get_mut(&index).style.background_color = if pico.hovered(&index) {
         c + Vec4::splat(0.06)
     } else {
         c
@@ -63,7 +63,7 @@ pub fn hr(pico: &mut Pico, width: Val, height: Val, parent: Option<ItemIndex>) -
         width,
         height,
         style: ItemStyle {
-            background: Color::rgba(1.0, 1.0, 1.0, 0.04),
+            background_color: Color::rgba(1.0, 1.0, 1.0, 0.04),
             ..default()
         },
         anchor: Anchor::TopCenter,
@@ -85,7 +85,7 @@ pub fn drag_value(
     char_input_events: Option<&mut EventReader<ReceivedCharacter>>,
 ) -> f32 {
     let mut value = value;
-    let mut drag_bg = pico.get_mut(&drag_index).style.background;
+    let mut drag_bg = pico.get_mut(&drag_index).style.background_color;
 
     let mut dragging = false;
     if let Some(state) = pico.get_state(&drag_index) {
@@ -170,7 +170,7 @@ pub fn drag_value(
             drag_bg += Vec4::splat(0.25);
         }
     }
-    pico.get_mut(&drag_index).style.background = if pico.hovered(&drag_index) || dragging {
+    pico.get_mut(&drag_index).style.background_color = if pico.hovered(&drag_index) || dragging {
         drag_bg + Vec4::splat(0.06)
     } else {
         drag_bg
@@ -213,7 +213,7 @@ pub fn basic_drag_widget(
         height: Val::Percent(100.0),
         style: ItemStyle {
             corner_radius: Val::Percent(10.0),
-            background: bg,
+            background_color: bg,
             ..default()
         },
         anchor: Anchor::TopLeft,
@@ -329,7 +329,7 @@ impl ScrollAreaWidget {
                         width: Val::Percent(100.0),
                         height: Val::Percent(5.0),
                         style: ItemStyle {
-                            background: Color::rgb(0.2, 0.2, 0.2),
+                            background_color: Color::rgb(0.2, 0.2, 0.2),
                             ..default()
                         },
                         anchor_parent: Anchor::TopLeft,
@@ -349,7 +349,7 @@ impl ScrollAreaWidget {
                         width: Val::Percent(100.0),
                         height: Val::Percent(5.0),
                         style: ItemStyle {
-                            background: Color::rgb(0.2, 0.2, 0.2),
+                            background_color: Color::rgb(0.2, 0.2, 0.2),
                             ..default()
                         },
                         anchor_parent: Anchor::TopLeft,
