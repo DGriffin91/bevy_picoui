@@ -65,7 +65,7 @@ pub fn render(
     let mut items = std::mem::take(&mut pico.items);
 
     // Sort so we interact in z order.
-    items.sort_by(|a, b| b.depth.unwrap().partial_cmp(&a.depth.unwrap()).unwrap());
+    items.sort_by(|a, b| b.get_depth().partial_cmp(&a.get_depth()).unwrap());
 
     let mut item_positions = Vec::new();
 
@@ -75,21 +75,17 @@ pub fn render(
             item.id = Some(item.generate_id());
         }
 
-        if item.spatial_id.is_none() {
-            item.spatial_id = Some(item.generate_spatial_id());
-        }
+        let spatial_id = item.get_spatial_id();
 
-        let spatial_id = item.spatial_id.unwrap();
-
-        let mut item_ndc =
-            ((item.uv_position - Vec2::splat(0.5)) * vec2(2.0, -2.0)).extend(item.depth.unwrap());
+        let mut item_ndc = ((item.get_uv_position() - Vec2::splat(0.5)) * vec2(2.0, -2.0))
+            .extend(item.get_depth());
 
         if let Some(position_3d) = item.position_3d {
             item_ndc = camera
                 .world_to_ndc(camera_transform, position_3d)
                 .unwrap_or(Vec3::NAN);
             // include 2d offset
-            item_ndc += ((item.uv_position) * vec2(2.0, -2.0)).extend(item.depth.unwrap());
+            item_ndc += ((item.get_uv_position()) * vec2(2.0, -2.0)).extend(item.get_depth());
         }
 
         let item_pos = item_ndc.xy() * window_size * 0.5;
@@ -155,7 +151,7 @@ pub fn render(
 
     // It seems that we need to add things in z order for them to show up in that order initially
     for (item, item_pos) in items.iter_mut().zip(item_positions.iter()) {
-        let spatial_id = item.spatial_id.unwrap();
+        let spatial_id = item.get_spatial_id();
 
         let generate = if let Some(existing_state_item) = pico.state.get_mut(&spatial_id) {
             existing_state_item.id != item.id.unwrap()
@@ -164,10 +160,11 @@ pub fn render(
         };
         if generate || pico.window_size != window_size {
             let mut corner_radius =
-                pico.valp_y(item.style.corner_radius, item.uv_size) * window_size.y;
-            let size = item.uv_size * window_size;
-            let font_size = pico.valp_y(item.style.font_size, item.uv_size) * window_size.y;
-            let border_width = pico.valp_y(item.style.border_width, item.uv_size) * window_size.y;
+                pico.valp_y(item.style.corner_radius, item.get_uv_size()) * window_size.y;
+            let size = item.get_uv_size() * window_size;
+            let font_size = pico.valp_y(item.style.font_size, item.get_uv_size()) * window_size.y;
+            let border_width =
+                pico.valp_y(item.style.border_width, item.get_uv_size()) * window_size.y;
             let border_width_x2 = border_width * 2.0;
 
             corner_radius = corner_radius.min(size.x).min(size.y);
@@ -194,13 +191,13 @@ pub fn render(
                 alignment: item.style.text_alignment,
                 linebreak_behavior: BreakLineOn::WordBoundary,
             };
-            state_item.life = item.life;
+            state_item.life = item.get_life();
             state_item.id = item.id.unwrap();
-            if item.uv_size.x > 0.0 || item.uv_size.y > 0.0 {
+            if item.get_uv_size().x > 0.0 || item.get_uv_size().y > 0.0 {
                 let trans = Transform::from_translation(*item_pos);
                 let mut entity = commands.spawn(PicoEntity {
                     spatial_id,
-                    anchor: item.anchor.clone(),
+                    anchor: item.get_anchor(),
                     size,
                 });
 
@@ -215,7 +212,7 @@ pub fn render(
                 let using_border = item.style.border_color.a() > 0.0 && border_width > 0.0;
 
                 entity.with_children(|builder| {
-                    let item_anchor_vec = item.anchor.as_vec();
+                    let item_anchor_vec = item.get_anchor().as_vec();
                     if item.style.background.a() > 0.0 {
                         let anchor_trans = (-item_anchor_vec * size).extend(0.0);
                         generate_rect_entities(
@@ -256,9 +253,9 @@ pub fn render(
                     });
                 });
                 state_item.bbox = get_bbox(
-                    item.uv_size,
+                    item.get_uv_size(),
                     trans.translation.xy() / window_size * vec2(1.0, -1.0) + 0.5,
-                    &item.anchor,
+                    &item.get_anchor(),
                 );
                 state_item.interactable = true;
                 state_item.entity = Some(entity.id());
@@ -267,7 +264,7 @@ pub fn render(
                     .spawn((
                         PicoEntity {
                             spatial_id,
-                            anchor: item.anchor.clone(),
+                            anchor: item.get_anchor().clone(),
                             size,
                         },
                         Text2dBundle {

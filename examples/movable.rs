@@ -55,7 +55,7 @@ fn update(mut pico: ResMut<Pico>, mut position: Local<Option<Vec2>>) {
     }
 
     // Clamp position to parent box
-    let bbox = pico.bbox(main_box);
+    let bbox = pico.get(main_box).get_bbox();
     let mut size = (bbox.zw() - bbox.xy()) / 2.0;
     size -= vec2(pico.val_x(radius), pico.val_y(radius)); // include circle radius
     *position = position.clamp(-size, size);

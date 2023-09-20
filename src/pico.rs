@@ -11,7 +11,7 @@ use std::collections::hash_map::DefaultHasher;
 
 use crate::{
     guard::Guard,
-    hash::{hash_anchor, hash_color, hash_val, hash_vec4},
+    hash::{hash_anchor, hash_color, hash_val, hash_vec2, hash_vec3, hash_vec4},
     renderer::MAJOR_DEPTH_AUTO_STEP,
 };
 
@@ -66,6 +66,73 @@ impl Hash for ItemStyle {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct ProcessedPicoItem {
+    pub text: String,
+    pub style: ItemStyle,
+    /// uv position within window
+    uv_position: Vec2,
+    /// uv size within window
+    uv_size: Vec2,
+    /// 3d world space position.
+    pub position_3d: Option<Vec3>,
+    /// z position for 2d 1.0 is closer to camera 0.0 is further
+    /// None for auto (calculated by order)
+    depth: f32,
+    /// Max z position of immediate children, used for auto z
+    child_max_depth: f32,
+    /// If life is 0.0, it will only live one frame (default), if life is f32::INFINITY it will live forever.
+    life: f32,
+    /// If the id changes, the item is re-rendered
+    pub id: Option<u64>,
+    /// If the spatial_id changes a new state is used
+    /// Impacted by position, size, anchor (after transform from parent is applied, if any)
+    spatial_id: u64,
+    /// If set, coordinates for position/size will be relative to parent.
+    parent: Option<ItemIndex>,
+    // Coordinates are uv space 0..1 over the whole window
+    bbox: Vec4,
+    anchor: Anchor,
+}
+
+impl ProcessedPicoItem {
+    pub fn get_uv_position(&self) -> Vec2 {
+        self.uv_position
+    }
+    pub fn get_uv_size(&self) -> Vec2 {
+        self.uv_size
+    }
+    pub fn get_depth(&self) -> f32 {
+        self.depth
+    }
+    pub fn get_spatial_id(&self) -> u64 {
+        self.spatial_id
+    }
+    pub fn get_parent(&self) -> Option<ItemIndex> {
+        self.parent
+    }
+    pub fn get_bbox(&self) -> Vec4 {
+        self.bbox
+    }
+    pub fn get_life(&self) -> f32 {
+        self.life
+    }
+    pub fn get_anchor(&self) -> Anchor {
+        self.anchor.clone()
+    }
+    pub fn generate_id(&mut self) -> u64 {
+        self.id = None;
+        let state = &mut DefaultHasher::new();
+        self.spatial_id.hash(state);
+        hash_vec4(&self.bbox, state);
+        self.depth.to_bits().hash(state);
+        self.text.hash(state);
+        self.life.to_bits().hash(state);
+        self.style.hash(state);
+        state.finish()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct PicoItem {
     pub text: String,
@@ -76,17 +143,15 @@ pub struct PicoItem {
     pub style: ItemStyle,
     pub anchor: Anchor,
     pub anchor_parent: Anchor,
-    /// uv position within window, is combined with x, y at pico.add(). Don't change after pico.add()
+    /// uv position within window, is combined with x, y at pico.add().
     pub uv_position: Vec2,
-    /// uv size within window, is combined with width, height at pico.add(). Don't change after pico.add()
+    /// uv size within window, is combined with width, height at pico.add().
     pub uv_size: Vec2,
-    /// 3d world space position. Don't change after pico.add()
+    /// 3d world space position.
     pub position_3d: Option<Vec3>,
     /// z position for 2d 1.0 is closer to camera 0.0 is further
     /// None for auto (calculated by order)
     pub depth: Option<f32>,
-    /// Max z position of immediate children, used for auto z
-    pub child_max_depth: f32,
     /// If life is 0.0, it will only live one frame (default), if life is f32::INFINITY it will live forever.
     pub life: f32,
     /// If the id changes, the item is re-rendered
@@ -96,8 +161,6 @@ pub struct PicoItem {
     pub spatial_id: Option<u64>,
     /// If set, coordinates for position/size will be relative to parent.
     pub parent: Option<ItemIndex>,
-    // Coordinates are uv space 0..1 over the whole window
-    pub computed_bbox: Option<Vec4>,
 }
 
 impl Default for PicoItem {
@@ -113,14 +176,12 @@ impl Default for PicoItem {
             uv_position: Vec2::ZERO,
             position_3d: None,
             depth: None,
-            child_max_depth: 0.0,
             uv_size: Vec2::ZERO,
             text: String::new(),
             life: 0.0,
             id: None,
             spatial_id: None,
             parent: None,
-            computed_bbox: None,
         }
     }
 }
@@ -144,48 +205,26 @@ impl PicoItem {
         self.life = f32::INFINITY;
         self
     }
-    pub fn generate_spatial_id(&self) -> u64 {
+    pub fn generate_spatial_id(
+        uv_position: &Vec2,
+        uv_size: &Vec2,
+        depth: &f32,
+        position_3d: &Option<Vec3>,
+        anchor: &Anchor,
+        anchor_text: &Anchor,
+        parent: &Option<ItemIndex>,
+    ) -> u64 {
         let hasher = &mut DefaultHasher::new();
-        self.uv_position.x.to_bits().hash(hasher);
-        self.uv_position.y.to_bits().hash(hasher);
-        self.uv_size.x.to_bits().hash(hasher);
-        self.uv_size.y.to_bits().hash(hasher);
-        if let Some(depth) = self.depth {
-            depth.to_bits().hash(hasher);
+        hash_vec2(&uv_position, hasher);
+        hash_vec2(&uv_size, hasher);
+        depth.to_bits().hash(hasher);
+        if let Some(position_3d) = position_3d {
+            hash_vec3(&position_3d, hasher);
         }
-        if let Some(position_3d) = self.position_3d {
-            position_3d.x.to_bits().hash(hasher);
-            position_3d.y.to_bits().hash(hasher);
-            position_3d.z.to_bits().hash(hasher);
-        }
-        hash_anchor(&self.anchor, hasher);
-        hash_anchor(&self.anchor_parent, hasher);
-        hash_anchor(&self.style.anchor_text, hasher);
-        self.parent.hash(hasher);
+        hash_anchor(&anchor, hasher);
+        hash_anchor(&anchor_text, hasher);
+        parent.hash(hasher);
         hasher.finish()
-    }
-    pub fn generate_id(&mut self) -> u64 {
-        self.id = None;
-        let state = &mut DefaultHasher::new();
-        self.spatial_id.unwrap().hash(state);
-        hash_vec4(&self.computed_bbox.unwrap(), state);
-        self.depth.unwrap().to_bits().hash(state);
-        self.text.hash(state);
-        self.life.to_bits().hash(state);
-        self.style.hash(state);
-        state.finish()
-    }
-}
-
-impl std::hash::Hash for PicoItem {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.spatial_id.unwrap().hash(state)
-    }
-}
-
-impl PartialEq for PicoItem {
-    fn eq(&self, other: &PicoItem) -> bool {
-        self.spatial_id.unwrap() == other.spatial_id.unwrap()
     }
 }
 
@@ -223,7 +262,7 @@ pub struct Stack {
 #[derive(Resource, Default)]
 pub struct Pico {
     pub state: HashMap<u64, StateItem>,
-    pub items: Vec<PicoItem>,
+    pub items: Vec<ProcessedPicoItem>,
     pub interacting: bool,
     pub stack_stack: Vec<Stack>,
     pub stack_guard: Guard,
@@ -234,7 +273,7 @@ pub struct Pico {
 
 impl Pico {
     pub fn vstack(&mut self, start: Val, margin: Val, parent: ItemIndex) -> Guard {
-        let bbox = self.bbox(parent);
+        let bbox = self.get(parent).bbox;
         let parent_size = (bbox.zw() - bbox.xy()).abs();
         let start = self.valp_y(start, parent_size);
         let margin = self.valp_y(margin, parent_size);
@@ -249,7 +288,7 @@ impl Pico {
     }
 
     pub fn hstack(&mut self, start: Val, margin: Val, parent: ItemIndex) -> Guard {
-        let bbox = self.bbox(parent);
+        let bbox = self.get(parent).bbox;
         let parent_size = (bbox.zw() - bbox.xy()).abs();
         let start = self.valp_x(start, parent_size);
         let margin = self.valp_x(margin, parent_size);
@@ -299,16 +338,8 @@ impl Pico {
         false
     }
 
-    pub fn bbox(&self, index: ItemIndex) -> Vec4 {
-        let item = self.get(index);
-        if let Some(computed_bbox) = item.computed_bbox {
-            return computed_bbox;
-        }
-        vec4(0.0, 0.0, 1.0, 1.0)
-    }
-
     pub fn center(&self, index: ItemIndex) -> Vec2 {
-        let bbox = self.bbox(index);
+        let bbox = self.get(index).bbox;
         (bbox.xy() + bbox.zw()) / 2.0
     }
 
@@ -321,45 +352,68 @@ impl Pico {
         self.internal_auto_depth
     }
 
-    pub fn add(&mut self, mut item: PicoItem) -> ItemIndex {
-        if let Some(parent_index) = item.parent {
+    pub fn add(&mut self, item: PicoItem) -> ItemIndex {
+        let mut item_depth = item.depth;
+        let item_x = item.x;
+        let item_y = item.y;
+        let item_width = item.width;
+        let item_height = item.height;
+        let item_anchor_parent = item.anchor_parent;
+        let item_spatial_id = item.spatial_id;
+        let mut processed_item = ProcessedPicoItem {
+            text: item.text,
+            style: item.style,
+            uv_position: item.uv_position,
+            uv_size: item.uv_size,
+            life: item.life,
+            id: item.id,
+            parent: item.parent,
+            anchor: item.anchor,
+            position_3d: item.position_3d,
+            child_max_depth: 0.0,
+            spatial_id: default(),
+            depth: default(),
+            bbox: default(),
+        };
+
+        if let Some(parent_index) = processed_item.parent {
             let parent = self.get(parent_index);
-            if let Some(parent_depth) = parent.depth {
-                if let Some(depth) = &mut item.depth {
-                    *depth += parent_depth;
-                    if *depth == parent_depth {
-                        // Make sure child is in front of parent if they were at the same z
-                        *depth += MAJOR_DEPTH_AUTO_STEP;
-                    }
-                } else {
-                    item.depth = Some(
-                        (parent_depth + MAJOR_DEPTH_AUTO_STEP)
-                            .max(parent.child_max_depth + MAJOR_DEPTH_AUTO_STEP),
-                    );
+            if let Some(depth) = &mut item_depth {
+                *depth += parent.depth;
+                if *depth == parent.depth {
+                    // Make sure child is in front of parent if they were at the same z
+                    *depth += MAJOR_DEPTH_AUTO_STEP;
                 }
+            } else {
+                item_depth = Some(
+                    (parent.depth + MAJOR_DEPTH_AUTO_STEP)
+                        .max(parent.child_max_depth + MAJOR_DEPTH_AUTO_STEP),
+                );
             }
         }
 
-        if item.depth.is_none() {
-            item.depth = Some(self.auto_depth());
+        if item_depth.is_none() {
+            item_depth = Some(self.auto_depth());
         }
 
-        let parent_2d_bbox = if let Some(parent_index) = item.parent {
+        processed_item.depth = item_depth.unwrap();
+
+        let parent_2d_bbox = if let Some(parent_index) = processed_item.parent {
             let parent = self.get_mut(parent_index);
-            parent.child_max_depth = parent.child_max_depth.max(item.depth.unwrap());
-            self.bbox(parent_index)
+            parent.child_max_depth = parent.child_max_depth.max(processed_item.depth);
+            self.get(parent_index).bbox
         } else {
             vec4(0.0, 0.0, 1.0, 1.0)
         };
 
         let parent_size = (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
 
-        let vx = self.valp_x(item.x, parent_size) / parent_size.x;
-        let vy = self.valp_y(item.y, parent_size) / parent_size.y;
-        let vw = self.valp_x(item.width, parent_size) / parent_size.x;
-        let vh = self.valp_y(item.height, parent_size) / parent_size.y;
+        let vx = self.valp_x(item_x, parent_size) / parent_size.x;
+        let vy = self.valp_y(item_y, parent_size) / parent_size.y;
+        let vw = self.valp_x(item_width, parent_size) / parent_size.x;
+        let vh = self.valp_y(item_height, parent_size) / parent_size.y;
 
-        let pa_vec = item.anchor_parent.as_vec() * vec2(1.0, -1.0);
+        let pa_vec = item_anchor_parent.as_vec() * vec2(1.0, -1.0);
         let mut uv_position = vec2(vx, vy);
         uv_position *= -pa_vec * 2.0;
         uv_position += pa_vec + vec2(0.5, 0.5);
@@ -372,43 +426,66 @@ impl Pico {
             uv_position.y += vy;
         }
 
-        item.uv_position += uv_position;
+        processed_item.uv_position += uv_position;
 
-        item.uv_position = lerp2(parent_2d_bbox.xy(), parent_2d_bbox.zw(), item.uv_position);
-        item.uv_size += vec2(vw, vh);
-        item.uv_size *= (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
+        processed_item.uv_position = lerp2(
+            parent_2d_bbox.xy(),
+            parent_2d_bbox.zw(),
+            processed_item.uv_position,
+        );
+        processed_item.uv_size += vec2(vw, vh);
+        processed_item.uv_size *= (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
 
         while (self.stack_guard.get() as usize) < self.stack_stack.len() {
             self.stack_stack.pop();
         }
-        if !self.stack_stack.is_empty() && item.parent.is_some() {
+        if !self.stack_stack.is_empty() && processed_item.parent.is_some() {
             let stack = self.stack_stack.last_mut().unwrap();
             if !stack.bypass {
                 if stack.vertical {
-                    item.uv_position.y += stack.end;
-                    let bbox = get_bbox(item.uv_size, item.uv_position, &item.anchor);
+                    processed_item.uv_position.y += stack.end;
+                    let bbox = get_bbox(
+                        processed_item.uv_size,
+                        processed_item.uv_position,
+                        &processed_item.anchor,
+                    );
                     stack.end = stack.end.max(bbox.w - parent_2d_bbox.y) + stack.margin;
                 } else {
-                    item.uv_position.x += stack.end;
-                    let bbox = get_bbox(item.uv_size, item.uv_position, &item.anchor);
+                    processed_item.uv_position.x += stack.end;
+                    let bbox = get_bbox(
+                        processed_item.uv_size,
+                        processed_item.uv_position,
+                        &processed_item.anchor,
+                    );
                     stack.end = stack.end.max(bbox.z - parent_2d_bbox.x) + stack.margin;
                 }
             }
         }
 
-        if item.spatial_id.is_none() {
-            item.spatial_id = Some(item.generate_spatial_id());
-        }
-        item.computed_bbox = Some(if item.position_3d.is_some() {
-            if let Some(state_item) = self.state.get(&item.spatial_id.unwrap()) {
+        processed_item.spatial_id = item_spatial_id.unwrap_or(PicoItem::generate_spatial_id(
+            &processed_item.uv_position,
+            &processed_item.uv_size,
+            &processed_item.depth,
+            &processed_item.position_3d,
+            &processed_item.anchor,
+            &processed_item.style.anchor_text,
+            &processed_item.parent,
+        ));
+
+        processed_item.bbox = if processed_item.position_3d.is_some() {
+            if let Some(state_item) = self.state.get(&processed_item.spatial_id) {
                 state_item.bbox
             } else {
                 Vec4::ZERO
             }
         } else {
-            get_bbox(item.uv_size, item.uv_position, &item.anchor)
-        });
-        self.items.push(item);
+            get_bbox(
+                processed_item.uv_size,
+                processed_item.uv_position,
+                &processed_item.anchor,
+            )
+        };
+        self.items.push(processed_item);
         ItemIndex(self.items.len() - 1)
     }
 
@@ -477,14 +554,15 @@ impl Pico {
     }
 
     pub fn get_state_mut(&mut self, index: ItemIndex) -> Option<&mut StateItem> {
-        self.state.get_mut(&self.get(index).spatial_id.unwrap())
+        let id = self.get(index).spatial_id;
+        self.state.get_mut(&id)
     }
 
     pub fn get_state(&self, index: ItemIndex) -> Option<&StateItem> {
-        self.state.get(&self.get(index).spatial_id.unwrap())
+        self.state.get(&self.get(index).spatial_id)
     }
 
-    pub fn get_mut(&mut self, index: ItemIndex) -> &mut PicoItem {
+    pub fn get_mut(&mut self, index: ItemIndex) -> &mut ProcessedPicoItem {
         if index.0 >= self.items.len() {
             panic!(
                 "Tried to access item {} but there are only {}",
@@ -495,7 +573,7 @@ impl Pico {
         &mut self.items[index.0]
     }
 
-    pub fn get(&self, index: ItemIndex) -> &PicoItem {
+    pub fn get(&self, index: ItemIndex) -> &ProcessedPicoItem {
         if index.0 >= self.items.len() {
             panic!(
                 "Tried to access item {} but there are only {}",
@@ -508,7 +586,7 @@ impl Pico {
 
     pub fn storage(&mut self) -> Option<&mut Option<Box<dyn std::any::Any + Send + Sync>>> {
         if let Some(item) = self.items.last() {
-            if let Some(state_item) = self.state.get_mut(&item.spatial_id.unwrap()) {
+            if let Some(state_item) = self.state.get_mut(&item.spatial_id) {
                 return Some(&mut state_item.storage);
             }
         }
