@@ -38,7 +38,7 @@ fn update(mut pico: ResMut<Pico>, windows: Query<&Window>) {
     };
 
     {
-        let _guard = pico.vstack(Val::Px(0.0), Val::Px(0.0), main_box);
+        let _guard = pico.vstack(Val::Px(0.0), Val::Px(0.0), &main_box);
 
         for i in 0..3 {
             let lane = pico.add(PicoItem {
@@ -49,7 +49,7 @@ fn update(mut pico: ResMut<Pico>, windows: Query<&Window>) {
                 ..default()
             });
             {
-                let _guard = pico.hstack(Val::Px(0.0), Val::Px(0.0), lane);
+                let _guard = pico.hstack(Val::Px(0.0), Val::Px(0.0), &lane);
                 for j in 0..7 {
                     let cell = pico.add(PicoItem {
                         width: Val::Percent(100.0 / 7.0),
@@ -76,7 +76,7 @@ fn update(mut pico: ResMut<Pico>, windows: Query<&Window>) {
                             parent: Some(cell),
                             ..default()
                         });
-                        if pico.hovered(btn) {
+                        if pico.hovered(&btn) {
                             if let Some(cursor_position) = window.cursor_position() {
                                 let tooltip = pico.add(PicoItem {
                                     x: Val::Px(cursor_position.x),

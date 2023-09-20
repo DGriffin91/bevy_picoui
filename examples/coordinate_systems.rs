@@ -237,7 +237,7 @@ fn update(
     };
 
     {
-        let _guard = pico.vstack(Val::Vh(1.0), Val::Vh(0.5), side_bar);
+        let _guard = pico.vstack(Val::Vh(1.0), Val::Vh(0.5), &side_bar);
         pico.add(PicoItem {
             x: Val::Percent(50.0),
             width: Val::Percent(100.0),
@@ -293,7 +293,7 @@ fn update(
             },
         );
 
-        if pico.clicked(btn) {
+        if pico.clicked(&btn) {
             *trans = get_default_cam_trans();
         }
     }

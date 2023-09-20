@@ -119,8 +119,8 @@ fn spawn_button(
         parent: Some(parent.clone()),
         ..default()
     });
-    let hovered = pico.hovered(btn_index);
-    let btn = pico.get_mut(btn_index);
+    let hovered = pico.hovered(&btn_index);
+    let btn = pico.get_mut(&btn_index);
     if hovered {
         btn.style.background = Color::ORANGE_RED;
     }

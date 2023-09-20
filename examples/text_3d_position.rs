@@ -105,12 +105,12 @@ fn update(mut gizmos: Gizmos, mut pico: ResMut<Pico>) {
         anchor: Anchor::TopLeft,
         ..default()
     });
-    if pico.hovered(axis_text_index) {
+    if pico.hovered(&axis_text_index) {
         // Make axis text more opaque
-        pico.get_mut(axis_text_index).style.background = Color::rgba(0.1, 0.1, 0.1, 0.8);
+        pico.get_mut(&axis_text_index).style.background = Color::rgba(0.1, 0.1, 0.1, 0.8);
 
         // Get 2d bounding box of axis text
-        let state = pico.get_state(axis_text_index).unwrap();
+        let state = pico.get_state(&axis_text_index).unwrap();
         let position = vec2(state.bbox.x, state.bbox.w + 0.01);
 
         // Add 2d text

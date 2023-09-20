@@ -1,4 +1,9 @@
-use bevy::{math::vec2, prelude::*, sprite::Anchor};
+use bevy::{
+    input::mouse::{MouseScrollUnit, MouseWheel},
+    math::vec2,
+    prelude::*,
+    sprite::Anchor,
+};
 
 use crate::{
     pico::{ItemIndex, ItemStyle, PicoItem},
@@ -11,8 +16,8 @@ use crate::{
 
 pub fn button(pico: &mut Pico, item: PicoItem) -> ItemIndex {
     let index = pico.add(item);
-    let c = pico.get(index).style.background;
-    pico.get_mut(index).style.background = if pico.hovered(index) {
+    let c = pico.get(&index).style.background;
+    pico.get_mut(&index).style.background = if pico.hovered(&index) {
         c + Vec4::splat(0.06)
     } else {
         c
@@ -31,14 +36,14 @@ pub fn toggle_button(
     toggle_state: &mut bool,
 ) -> ItemIndex {
     let index = pico.add(item);
-    let mut c = pico.get(index).style.background;
-    if pico.clicked(index) {
+    let mut c = pico.get(&index).style.background;
+    if pico.clicked(&index) {
         *toggle_state = !*toggle_state;
     }
     if *toggle_state {
         c = enabled_bg;
     }
-    pico.get_mut(index).style.background = if pico.hovered(index) {
+    pico.get_mut(&index).style.background = if pico.hovered(&index) {
         c + Vec4::splat(0.06)
     } else {
         c
@@ -80,10 +85,10 @@ pub fn drag_value(
     char_input_events: Option<&mut EventReader<ReceivedCharacter>>,
 ) -> f32 {
     let mut value = value;
-    let mut drag_bg = pico.get_mut(drag_index).style.background;
+    let mut drag_bg = pico.get_mut(&drag_index).style.background;
 
     let mut dragging = false;
-    if let Some(state) = pico.get_state(drag_index) {
+    if let Some(state) = pico.get_state(&drag_index) {
         if let Some(drag) = state.drag {
             let delta = drag.delta();
             value += (delta.x - delta.y) * scale;
@@ -101,11 +106,11 @@ pub fn drag_value(
             false
         };
         let mut current_string = None;
-        let released = pico.released(drag_index);
+        let released = pico.released(&drag_index);
         let mut reset = false;
         let mut apply = false;
         let mut selected = false;
-        if let Some(state) = pico.get_state_mut(drag_index) {
+        if let Some(state) = pico.get_state_mut(&drag_index) {
             let mut just_selected = false;
             if state.storage.is_none() {
                 state.storage = Some(Box::<String>::default());
@@ -159,13 +164,13 @@ pub fn drag_value(
             }
         }
         if let Some(current_string) = current_string {
-            pico.get_mut(drag_index).text = current_string + "|";
+            pico.get_mut(&drag_index).text = current_string + "|";
         }
         if selected {
             drag_bg += Vec4::splat(0.25);
         }
     }
-    pico.get_mut(drag_index).style.background = if pico.hovered(drag_index) || dragging {
+    pico.get_mut(&drag_index).style.background = if pico.hovered(&drag_index) || dragging {
         drag_bg + Vec4::splat(0.06)
     } else {
         drag_bg
@@ -187,7 +192,7 @@ pub fn basic_drag_widget(
     char_input_events: &mut EventReader<ReceivedCharacter>,
     relative: bool,
 ) -> f32 {
-    let _guard = pico.hstack(Val::Percent(5.0), Val::Percent(1.0), parent);
+    let _guard = pico.hstack(Val::Percent(5.0), Val::Percent(1.0), &parent);
     // Label Text
     pico.add(PicoItem {
         text: label.to_string(),
@@ -218,11 +223,223 @@ pub fn basic_drag_widget(
     let value = drag_value(pico, scale, value, drag_index, Some(char_input_events));
     if relative {
         // Show relative value while dragging drag
-        if let Some(state) = pico.get_state_mut(drag_index) {
+        if let Some(state) = pico.get_state_mut(&drag_index) {
             if let Some(drag) = state.drag {
-                pico.get_mut(drag_index).text = format!("{:.2}", drag.total_delta().x * scale)
+                pico.get_mut(&drag_index).text = format!("{:.2}", drag.total_delta().x * scale)
             }
         }
     }
     value
+}
+
+// --------------------------
+// Example scroll area widget
+// --------------------------
+
+// TODO don't use percent for button heights, content area etc... either make configurable or Vh
+
+pub struct ScrollAreaWidget {
+    pub items: Vec<ItemIndex>,
+    pub scroll_widget: ItemIndex,
+    pub content_area: ItemIndex,
+    pub scroll_bar_area: ItemIndex,
+    pub up_btn: ItemIndex,
+    pub down_btn: ItemIndex,
+    pub lane: ItemIndex,
+    pub handle: ItemIndex,
+    pub position: i32,
+    pub fscroll_position: f32,
+    pub scroll_updated: bool,
+}
+
+impl ScrollAreaWidget {
+    pub fn new(
+        pico: &mut Pico,
+        scroll_range: i32,
+        max_items_to_show: i32,
+        id: u64,
+        parent: ItemIndex,
+        initial_scroll_position: Option<i32>,
+        mouse_wheel_events: &mut EventReader<MouseWheel>,
+    ) -> ScrollAreaWidget {
+        let mut items = Vec::new();
+        let scroll_widget;
+        let content_area;
+        let scroll_bar_area;
+        let up_btn;
+        let down_btn;
+        let lane;
+        let handle;
+        let mut scroll_position = 0;
+        let mut fscroll_position = 0.0;
+        let mut scroll_updated = false;
+        let mut fscroll_updated = false;
+
+        scroll_widget = pico.add(PicoItem {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            anchor: Anchor::TopLeft,
+            anchor_parent: Anchor::TopLeft,
+            parent: Some(parent),
+            ..default()
+        });
+
+        if let Some(state) = pico.get_state_mut(&scroll_widget) {
+            if state.storage.is_none() {
+                if let Some(initial_scroll_position) = initial_scroll_position {
+                    scroll_position = initial_scroll_position;
+                    fscroll_position = scroll_position as f32 / scroll_range as f32;
+                    state.storage = Some(Box::new((fscroll_position, scroll_position)));
+                }
+            }
+        }
+
+        {
+            let _guard = pico.vstack(Val::Px(0.0), Val::Px(0.0), &scroll_widget);
+
+            if let Some(state) = pico.get_state_mut(&scroll_widget) {
+                if let Some(storage) = &mut state.storage {
+                    let scroll_data = storage.downcast_mut::<(i32, f32)>().unwrap();
+                    scroll_position = scroll_data.0;
+                    fscroll_position = scroll_data.1;
+                }
+            }
+
+            {
+                let _guard = pico.hstack(Val::Px(0.0), Val::Px(0.0), &scroll_widget);
+                content_area = pico.add(PicoItem {
+                    width: Val::Percent(95.0),
+                    height: Val::Percent(100.0),
+                    anchor_parent: Anchor::TopLeft,
+                    anchor: Anchor::TopLeft,
+                    parent: Some(scroll_widget),
+                    ..default()
+                });
+                scroll_bar_area = pico.add(PicoItem {
+                    width: Val::Percent(5.0),
+                    height: Val::Percent(100.0),
+                    anchor_parent: Anchor::TopLeft,
+                    anchor: Anchor::TopLeft,
+                    parent: Some(scroll_widget),
+                    ..default()
+                });
+                {
+                    let _guard = pico.vstack(Val::Px(0.0), Val::Px(0.0), &scroll_bar_area);
+                    up_btn = pico.add(PicoItem {
+                        width: Val::Percent(100.0),
+                        height: Val::Percent(5.0),
+                        style: ItemStyle {
+                            background: Color::rgb(0.2, 0.2, 0.2),
+                            ..default()
+                        },
+                        anchor_parent: Anchor::TopLeft,
+                        anchor: Anchor::TopLeft,
+                        parent: Some(scroll_bar_area),
+                        ..default()
+                    });
+                    lane = pico.add(PicoItem {
+                        width: Val::Percent(100.0),
+                        height: Val::Percent(90.0),
+                        anchor_parent: Anchor::TopLeft,
+                        anchor: Anchor::TopLeft,
+                        parent: Some(scroll_bar_area),
+                        ..default()
+                    });
+                    down_btn = pico.add(PicoItem {
+                        width: Val::Percent(100.0),
+                        height: Val::Percent(5.0),
+                        style: ItemStyle {
+                            background: Color::rgb(0.2, 0.2, 0.2),
+                            ..default()
+                        },
+                        anchor_parent: Anchor::TopLeft,
+                        anchor: Anchor::TopLeft,
+                        parent: Some(scroll_bar_area),
+                        ..default()
+                    });
+
+                    {
+                        let handle_height_vh = 4.0;
+                        let lane_bbox = pico.get(&lane).get_bbox();
+                        let lane_height = (lane_bbox.w - lane_bbox.y) - handle_height_vh / 100.0;
+                        if let Some(state) = pico.state.get(&id) {
+                            if let Some(drag) = state.drag {
+                                let delta = drag.delta();
+                                fscroll_position =
+                                    (fscroll_position + delta.y / lane_height).clamp(0.0, 1.0);
+                                scroll_position = (fscroll_position * scroll_range as f32) as i32;
+                                fscroll_updated = true;
+                            };
+                        }
+                        if pico.hovered(&scroll_widget) {
+                            for event in mouse_wheel_events.iter() {
+                                scroll_position = (scroll_position
+                                    + match event.unit {
+                                        MouseScrollUnit::Line => -event.y,
+                                        MouseScrollUnit::Pixel => -event.y / 10.0, //TODO: idk about scale
+                                    } as i32)
+                                    .clamp(0, scroll_range);
+                                scroll_updated = true;
+                            }
+                        }
+                        let handle_abs_pos = (fscroll_position * lane_height) * 100.0;
+                        let _guard = pico.stack_bypass();
+                        handle = pico.add(PicoItem {
+                            y: Val::Vh(handle_abs_pos + handle_height_vh * 0.5),
+                            width: Val::Percent(100.0),
+                            height: Val::Vh(handle_height_vh),
+                            parent: Some(lane),
+                            anchor: Anchor::Center,
+                            anchor_parent: Anchor::TopCenter,
+                            spatial_id: Some(id), // Manually set id
+                            ..default()
+                        });
+                    }
+                    if pico.clicked(&up_btn) {
+                        scroll_position = (scroll_position - 1).max(0);
+                        scroll_updated = true;
+                    }
+                    if pico.clicked(&down_btn) {
+                        scroll_position = (scroll_position + 1).min(scroll_range as i32);
+                        scroll_updated = true;
+                    }
+                }
+                if scroll_updated {
+                    fscroll_position = scroll_position as f32 / scroll_range as f32;
+                }
+                {
+                    let _guard = pico.vstack(Val::Px(0.0), Val::Px(0.0), &content_area);
+                    let scroll_position = scroll_position as usize;
+                    for _ in scroll_position..scroll_position + max_items_to_show as usize {
+                        items.push(pico.add(PicoItem {
+                            width: Val::Percent(100.0),
+                            height: Val::Percent(100.0 / max_items_to_show as f32),
+                            anchor: Anchor::TopLeft,
+                            anchor_parent: Anchor::TopLeft,
+                            parent: Some(content_area),
+                            ..default()
+                        }));
+                    }
+                }
+            }
+            if scroll_updated || fscroll_updated {
+                if let Some(state) = pico.get_state_mut(&scroll_widget) {
+                    state.storage = Some(Box::new((scroll_position, fscroll_position)));
+                }
+            }
+        }
+        ScrollAreaWidget {
+            items,
+            scroll_widget,
+            content_area,
+            scroll_bar_area,
+            up_btn,
+            down_btn,
+            lane,
+            handle,
+            position: scroll_position,
+            fscroll_position,
+            scroll_updated: scroll_updated || fscroll_updated,
+        }
+    }
 }

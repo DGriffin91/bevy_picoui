@@ -94,7 +94,7 @@ fn update(
         )
         .clamp(0.0, 1.0);
 
-        let p = pico.center(drag_index);
+        let p = pico.center(&drag_index);
         points.push(p);
         let ws_p = pico.uv_position_to_ws_px(p);
         painter.color = Color::WHITE;

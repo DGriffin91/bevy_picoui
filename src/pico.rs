@@ -272,7 +272,7 @@ pub struct Pico {
 }
 
 impl Pico {
-    pub fn vstack(&mut self, start: Val, margin: Val, parent: ItemIndex) -> Guard {
+    pub fn vstack(&mut self, start: Val, margin: Val, parent: &ItemIndex) -> Guard {
         self.update_stack();
         let bbox = self.get(parent).bbox;
         let parent_size = (bbox.zw() - bbox.xy()).abs();
@@ -288,7 +288,7 @@ impl Pico {
         self.stack_guard.clone()
     }
 
-    pub fn hstack(&mut self, start: Val, margin: Val, parent: ItemIndex) -> Guard {
+    pub fn hstack(&mut self, start: Val, margin: Val, parent: &ItemIndex) -> Guard {
         self.update_stack();
         let bbox = self.get(parent).bbox;
         let parent_size = (bbox.zw() - bbox.xy()).abs();
@@ -314,7 +314,7 @@ impl Pico {
         self.stack_guard.clone()
     }
 
-    pub fn get_hovered(&self, index: ItemIndex) -> Option<&StateItem> {
+    pub fn get_hovered(&self, index: &ItemIndex) -> Option<&StateItem> {
         if let Some(state_item) = self.get_state(index) {
             if state_item.hover {
                 return Some(state_item);
@@ -323,7 +323,7 @@ impl Pico {
         None
     }
 
-    pub fn clicked(&self, index: ItemIndex) -> bool {
+    pub fn clicked(&self, index: &ItemIndex) -> bool {
         if let Some(state_item) = self.get_hovered(index) {
             if let Some(input) = &state_item.input {
                 return input.just_pressed(MouseButton::Left);
@@ -332,7 +332,7 @@ impl Pico {
         false
     }
 
-    pub fn released(&self, index: ItemIndex) -> bool {
+    pub fn released(&self, index: &ItemIndex) -> bool {
         if let Some(state_item) = self.get_hovered(index) {
             if let Some(input) = &state_item.input {
                 return input.just_released(MouseButton::Left);
@@ -341,12 +341,12 @@ impl Pico {
         false
     }
 
-    pub fn center(&self, index: ItemIndex) -> Vec2 {
+    pub fn center(&self, index: &ItemIndex) -> Vec2 {
         let bbox = self.get(index).bbox;
         (bbox.xy() + bbox.zw()) / 2.0
     }
 
-    pub fn hovered(&self, index: ItemIndex) -> bool {
+    pub fn hovered(&self, index: &ItemIndex) -> bool {
         self.get_hovered(index).is_some()
     }
 
@@ -380,7 +380,7 @@ impl Pico {
         };
 
         if let Some(parent_index) = processed_item.parent {
-            let parent = self.get(parent_index);
+            let parent = self.get(&parent_index);
             if let Some(depth) = &mut item_depth {
                 *depth += parent.depth;
                 if *depth == parent.depth {
@@ -402,9 +402,9 @@ impl Pico {
         processed_item.depth = item_depth.unwrap();
 
         let parent_2d_bbox = if let Some(parent_index) = processed_item.parent {
-            let parent = self.get_mut(parent_index);
+            let parent = self.get_mut(&parent_index);
             parent.child_max_depth = parent.child_max_depth.max(processed_item.depth);
-            self.get(parent_index).bbox
+            self.get(&parent_index).bbox
         } else {
             vec4(0.0, 0.0, 1.0, 1.0)
         };
@@ -560,16 +560,16 @@ impl Pico {
         (uv - 0.5) * vec2(1.0, -1.0) * self.window_size
     }
 
-    pub fn get_state_mut(&mut self, index: ItemIndex) -> Option<&mut StateItem> {
+    pub fn get_state_mut(&mut self, index: &ItemIndex) -> Option<&mut StateItem> {
         let id = self.get(index).spatial_id;
         self.state.get_mut(&id)
     }
 
-    pub fn get_state(&self, index: ItemIndex) -> Option<&StateItem> {
+    pub fn get_state(&self, index: &ItemIndex) -> Option<&StateItem> {
         self.state.get(&self.get(index).spatial_id)
     }
 
-    pub fn get_mut(&mut self, index: ItemIndex) -> &mut ProcessedPicoItem {
+    pub fn get_mut(&mut self, index: &ItemIndex) -> &mut ProcessedPicoItem {
         if index.0 >= self.items.len() {
             panic!(
                 "Tried to access item {} but there are only {}",
@@ -580,7 +580,7 @@ impl Pico {
         &mut self.items[index.0]
     }
 
-    pub fn get(&self, index: ItemIndex) -> &ProcessedPicoItem {
+    pub fn get(&self, index: &ItemIndex) -> &ProcessedPicoItem {
         if index.0 >= self.items.len() {
             panic!(
                 "Tried to access item {} but there are only {}",
