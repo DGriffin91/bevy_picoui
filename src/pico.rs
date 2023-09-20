@@ -273,6 +273,7 @@ pub struct Pico {
 
 impl Pico {
     pub fn vstack(&mut self, start: Val, margin: Val, parent: ItemIndex) -> Guard {
+        self.update_stack();
         let bbox = self.get(parent).bbox;
         let parent_size = (bbox.zw() - bbox.xy()).abs();
         let start = self.valp_y(start, parent_size);
@@ -288,6 +289,7 @@ impl Pico {
     }
 
     pub fn hstack(&mut self, start: Val, margin: Val, parent: ItemIndex) -> Guard {
+        self.update_stack();
         let bbox = self.get(parent).bbox;
         let parent_size = (bbox.zw() - bbox.xy()).abs();
         let start = self.valp_x(start, parent_size);
@@ -303,6 +305,7 @@ impl Pico {
     }
 
     pub fn stack_bypass(&mut self) -> Guard {
+        self.update_stack();
         self.stack_stack.push(Stack {
             bypass: true,
             ..default()
@@ -436,9 +439,7 @@ impl Pico {
         processed_item.uv_size += vec2(vw, vh);
         processed_item.uv_size *= (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
 
-        while (self.stack_guard.get() as usize) < self.stack_stack.len() {
-            self.stack_stack.pop();
-        }
+        self.update_stack();
         if !self.stack_stack.is_empty() && processed_item.parent.is_some() {
             let stack = self.stack_stack.last_mut().unwrap();
             if !stack.bypass {
@@ -487,6 +488,12 @@ impl Pico {
         };
         self.items.push(processed_item);
         ItemIndex(self.items.len() - 1)
+    }
+
+    fn update_stack(&mut self) {
+        while (self.stack_guard.get() as usize) < self.stack_stack.len() {
+            self.stack_stack.pop();
+        }
     }
 
     // get scaled v of uv for val
@@ -603,9 +610,11 @@ pub struct Drag {
 }
 
 impl Drag {
+    /// Units uv of the window
     pub fn delta(&self) -> Vec2 {
         self.end - self.last_frame
     }
+    /// Units uv of the window
     pub fn total_delta(&self) -> Vec2 {
         self.end - self.start
     }
