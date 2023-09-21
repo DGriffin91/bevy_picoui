@@ -6,7 +6,7 @@ use bevy::{
     utils::HashMap,
 };
 use core::hash::Hasher;
-use std::{collections::hash_map::DefaultHasher, f32::consts::PI};
+use std::{collections::hash_map::DefaultHasher, f32::consts::PI, hash::Hash};
 
 use crate::{
     hash::hash_color,
@@ -206,15 +206,21 @@ pub fn render(
                     ..default()
                 });
 
-                let material_handle =
-                    cached_materials.get(item.style.background_color, &mut materials);
+                let material_handle = cached_materials.get(
+                    item.style.background_color,
+                    item.style.image.clone(),
+                    &mut materials,
+                );
                 let border_material_handle =
-                    cached_materials.get(item.style.border_color, &mut materials);
+                    cached_materials.get(item.style.border_color, None, &mut materials);
                 let using_border = item.style.border_color.a() > 0.0 && border_width > 0.0;
 
                 entity.with_children(|builder| {
                     let item_anchor_vec = item.get_anchor().as_vec();
-                    if item.style.background_color.a() > 0.0 || item.style.material.is_some() {
+                    if item.style.background_color.a() > 0.0
+                        || item.style.material.is_some()
+                        || item.style.image.is_some()
+                    {
                         let anchor_trans = (-item_anchor_vec * size).extend(0.0);
                         generate_rect_entities(
                             corner_radius,
@@ -313,16 +319,24 @@ impl ColorMaterialCache {
     fn get(
         &mut self,
         color: Color,
+        image: Option<Handle<Image>>,
         materials: &mut Assets<ColorMaterial>,
     ) -> Handle<ColorMaterial> {
         let hasher = &mut DefaultHasher::new();
         hash_color(&color, hasher);
+        if let Some(image) = &image {
+            image.id().hash(hasher);
+            1234i32.hash(hasher);
+        }
         let mat_hash = hasher.finish();
 
         let material_handle = if let Some(handle) = self.0.get(&mat_hash) {
             handle.clone()
         } else {
-            let handle = materials.add(ColorMaterial::from(color));
+            let handle = materials.add(ColorMaterial {
+                color,
+                texture: image.clone(),
+            });
             self.0.insert(mat_hash, handle.clone());
             handle
         };

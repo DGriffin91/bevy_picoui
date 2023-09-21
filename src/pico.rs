@@ -4,7 +4,7 @@ use bevy::{
     prelude::*,
     sprite::{Anchor, Material2d},
     text::DEFAULT_FONT_HANDLE,
-    utils::HashMap,
+    utils::{label::DynHash, HashMap},
 };
 use core::hash::Hash;
 use core::hash::Hasher;
@@ -39,6 +39,11 @@ pub struct ItemStyle {
     pub anchor_text: Anchor,
     pub text_alignment: TextAlignment,
     pub material: Option<Entity>,
+    // TODO fix uvs when using with rounded
+    // add options for how the image is projected
+    //     stretch, proportional height, proportional width, etc...
+    /// For image to be fully opaque with the correct colors, the background needs to be white.
+    pub image: Option<Handle<Image>>,
 }
 
 impl Default for ItemStyle {
@@ -54,6 +59,7 @@ impl Default for ItemStyle {
             text_alignment: TextAlignment::Center,
             anchor_text: Anchor::Center,
             material: None,
+            image: None,
         }
     }
 }
@@ -98,6 +104,9 @@ impl Hash for ItemStyle {
         hash_anchor(&self.anchor_text, state);
         if let Some(entity) = self.material {
             entity.hash(state);
+        }
+        if let Some(image) = &self.image {
+            image.id().dyn_hash(state);
         }
     }
 }
