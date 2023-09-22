@@ -6,6 +6,27 @@
 
 #import bevy_core_pipeline::tonemapping somewhat_boring_display_transform
 
+const MATERIAL_FLAGS_TEXTURE_BIT: u32 = 1u;
+
+struct CustomMaterial {
+    corner_radius: f32,
+    edge_softness: f32,
+    border_thickness: f32,
+    border_softness: f32,
+    border_color: vec4<f32>,
+    background_color1: vec4<f32>,
+    background_color2: vec4<f32>,
+    background_mat: mat4x4<f32>,
+    flags: u32,
+};
+
+@group(1) @binding(0)
+var<uniform> m: CustomMaterial;
+@group(1) @binding(1)
+var texture: texture_2d<f32>;
+@group(1) @binding(2)
+var texture_sampler: sampler;
+
 
 fn rounded_box_sdf(center: vec2<f32>, size: vec2<f32>, radius: vec4<f32>) -> f32 {
     var r = radius;
@@ -17,39 +38,42 @@ fn rounded_box_sdf(center: vec2<f32>, size: vec2<f32>, radius: vec4<f32>) -> f32
 
 @fragment
 fn fragment(in: MeshVertexOutput) -> @location(0) vec4<f32> {
-    let corner_radius = 100.0;
-    let edge_softness = 1.0;
-    var border_thickness = 0.0;
-    let border_softness = 0.0;
-    let border_color = vec4(1.0, 0.0, 0.0, 1.0);
-    let background_color = vec4(0.2, 0.2, 0.6, 1.0);
-    // TODO add gradient, texture
+    var border_thickness = m.border_thickness;
+
+    let bg_uv = (m.background_mat * vec4(in.uv - 0.5, 0.0, 1.0)).xy + 0.5;
+
+    var background_color = mix(m.background_color1, m.background_color2, bg_uv.x);
+
+
+    if ((m.flags & MATERIAL_FLAGS_TEXTURE_BIT) != 0u) {
+        background_color = background_color * textureSample(texture, texture_sampler, bg_uv);
+    }
 
     // Softening the border makes it larger, compensate for that
-    border_thickness = max(border_thickness - border_softness, 0.0);
-    let main_softness_offset = (max(border_softness, edge_softness));
+    border_thickness = max(border_thickness - m.border_softness, 0.0);
+    let main_softness_offset = (max(m.border_softness, m.edge_softness));
 
     // When the border or rect is softened we need to make the whole thing smaller to fit in the rect
-    let softness_offset = max(border_softness, edge_softness);
+    let softness_offset = max(m.border_softness, m.edge_softness);
 
     // mesh is 1x1 so the x and y scale is the full size of the rect
     let size = vec2(mesh.model[0][0], mesh.model[1][1]); 
 
     let max_radius = min(size.x, size.y)* 0.5;
-    let r = min(corner_radius, max_radius);
+    let r = min(m.corner_radius, max_radius);
 
     let pos = in.uv.xy * size;
 
     var distance = rounded_box_sdf(pos - (size / 2.0), size / 2.0, vec4(r));
 
-    let main_alpha = 1.0 - smoothstep(0.0, edge_softness, distance + main_softness_offset); 
-    let a = 1.0 - smoothstep(0.0, border_softness, -distance - border_thickness - softness_offset);
-    let b = 1.0 - smoothstep(0.0, border_softness, distance + softness_offset);
+    let main_alpha = 1.0 - smoothstep(0.0, m.edge_softness, distance + main_softness_offset); 
+    let a = 1.0 - smoothstep(0.0, m.border_softness, -distance - border_thickness - softness_offset);
+    let b = 1.0 - smoothstep(0.0, m.border_softness, distance + softness_offset);
     let border_alpha  = a * b;
 
     var color = background_color;
     color *= main_alpha;
-    color = mix(color, border_color, border_alpha);
+    color = mix(color, m.border_color, border_alpha);
 
     return color;
 }
