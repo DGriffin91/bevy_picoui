@@ -9,7 +9,7 @@
 const MATERIAL_FLAGS_TEXTURE_BIT: u32 = 1u;
 
 struct CustomMaterial {
-    corner_radius: f32,
+    corner_radius: vec4<f32>,
     edge_softness: f32,
     border_thickness: f32,
     border_softness: f32,
@@ -60,11 +60,11 @@ fn fragment(in: MeshVertexOutput) -> @location(0) vec4<f32> {
     let size = vec2(mesh.model[0][0], mesh.model[1][1]); 
 
     let max_radius = min(size.x, size.y)* 0.5;
-    let r = min(m.corner_radius, max_radius);
+    let r = min(m.corner_radius, vec4(max_radius));
 
     let pos = in.uv.xy * size;
 
-    var distance = rounded_box_sdf(pos - (size / 2.0), size / 2.0, vec4(r));
+    var distance = rounded_box_sdf(pos - (size / 2.0), size / 2.0, r);
 
     let main_alpha = 1.0 - smoothstep(0.0, m.edge_softness, distance + main_softness_offset); 
     let a = 1.0 - smoothstep(0.0, m.border_softness, -distance - border_thickness - softness_offset);

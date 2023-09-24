@@ -35,7 +35,7 @@ impl Plugin for RectangleMaterialPlugin {
 
 #[derive(ShaderType, Debug, Clone, Default)]
 pub struct RectangleMaterialUniform {
-    pub corner_radius: f32,
+    pub corner_radius: Vec4,
     pub edge_softness: f32,
     pub border_thickness: f32,
     pub border_softness: f32,
@@ -48,7 +48,7 @@ pub struct RectangleMaterialUniform {
 
 impl core::hash::Hash for RectangleMaterialUniform {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.corner_radius.to_bits().hash(state);
+        hash_vec4(&self.corner_radius, state);
         self.edge_softness.to_bits().hash(state);
         self.border_thickness.to_bits().hash(state);
         self.border_softness.to_bits().hash(state);

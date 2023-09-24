@@ -79,7 +79,7 @@ fn update(mut pico: ResMut<Pico>, windows: Query<&Window>) {
                         if pico.hovered(&btn) {
                             if let Some(cursor_position) = window.cursor_position() {
                                 let tooltip = pico.add(PicoItem {
-                                    x: Val::Px(cursor_position.x),
+                                    x: Val::Px(cursor_position.x + 15.0),
                                     y: Val::Px(cursor_position.y + 20.0),
                                     width: Val::Vh(20.0),
                                     height: Val::Vh(15.0),
@@ -87,6 +87,12 @@ fn update(mut pico: ResMut<Pico>, windows: Query<&Window>) {
                                         background_color: color,
                                         border_color: Color::WHITE,
                                         border_width: Val::Px(1.0),
+                                        multi_corner_radius: (
+                                            Val::Percent(0.0),
+                                            Val::Percent(20.0),
+                                            Val::Percent(20.0),
+                                            Val::Percent(20.0),
+                                        ),
                                         ..default()
                                     },
                                     anchor: Anchor::TopLeft,

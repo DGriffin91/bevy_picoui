@@ -32,21 +32,21 @@ pub struct MaterialHandleEntity<M: Material2d>(pub Handle<M>);
 pub struct ItemStyle {
     // 50% will result in a circle
     pub corner_radius: Val,
+    /// `corner_radius` is added to `multi_corner_radius`, usually set one or the other.
+    /// Order is clockwise: tl, tr, br, bl.
+    pub multi_corner_radius: (Val, Val, Val, Val),
     pub border_width: Val,
     pub border_color: Color,
     pub font_size: Val,
     pub font: Handle<Font>,
     pub text_color: Color,
     pub background_color: Color,
-    /// The gradient is added to the background_color, use Color::None on one or the other if color mixing is not desired.
+    /// The gradient is added to the `background_color`, use Color::None on one or the other if color mixing is not desired.
     pub background_gradient: (Color, Color),
     pub background_uv_transform: Transform,
     pub anchor_text: Anchor,
     pub text_alignment: TextAlignment,
     pub material: Option<Entity>,
-    // TODO fix uvs when using with rounded
-    // add options for how the image is projected
-    //     stretch, proportional height, proportional width, etc...
     /// For image to be fully opaque with the correct colors, the background needs to be white.
     pub image: Option<Handle<Image>>,
 }
@@ -55,6 +55,12 @@ impl Default for ItemStyle {
     fn default() -> Self {
         ItemStyle {
             corner_radius: Val::default(),
+            multi_corner_radius: (
+                Val::default(),
+                Val::default(),
+                Val::default(),
+                Val::default(),
+            ),
             border_width: Val::default(),
             border_color: Color::BLACK,
             font_size: Val::Vh(2.0),
@@ -101,6 +107,10 @@ impl ItemStyle {
 impl Hash for ItemStyle {
     fn hash<H: Hasher>(&self, state: &mut H) {
         hash_val(&self.corner_radius, state);
+        hash_val(&self.multi_corner_radius.0, state);
+        hash_val(&self.multi_corner_radius.1, state);
+        hash_val(&self.multi_corner_radius.2, state);
+        hash_val(&self.multi_corner_radius.3, state);
         hash_val(&self.border_width, state);
         hash_color(&self.border_color, state);
         hash_val(&self.font_size, state);
@@ -666,13 +676,26 @@ impl Pico {
             // Custom material is being used.
             return None;
         }
-        let corner_radius =
-            self.valp_y(item.style.corner_radius, item.get_uv_size()) * self.window_size.y;
-        let border_width =
-            self.valp_y(item.style.border_width, item.get_uv_size()) * self.window_size.y;
+        let uv_size = item.get_uv_size();
+        let corner_radius = self.valp_y(item.style.corner_radius, uv_size) * self.window_size.y;
+        let corner_radius0 =
+            self.valp_y(item.style.multi_corner_radius.0, uv_size) * self.window_size.y;
+        let corner_radius1 =
+            self.valp_y(item.style.multi_corner_radius.1, uv_size) * self.window_size.y;
+        let corner_radius2 =
+            self.valp_y(item.style.multi_corner_radius.2, uv_size) * self.window_size.y;
+        let corner_radius3 =
+            self.valp_y(item.style.multi_corner_radius.3, uv_size) * self.window_size.y;
+        let border_width = self.valp_y(item.style.border_width, uv_size) * self.window_size.y;
         let material = RectangleMaterial {
             material_settings: RectangleMaterialUniform {
-                corner_radius,
+                // re-order for tl, tr, br, bl
+                corner_radius: vec4(
+                    corner_radius2 + corner_radius,
+                    corner_radius1 + corner_radius,
+                    corner_radius3 + corner_radius,
+                    corner_radius0 + corner_radius,
+                ),
                 edge_softness: 1.0,
                 border_thickness: border_width,
                 border_softness: 1.0,
