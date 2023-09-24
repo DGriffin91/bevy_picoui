@@ -1,16 +1,16 @@
 use bevy::{
-    math::{vec2, vec3, Vec3Swizzles, Vec4Swizzles},
+    math::{vec2, Vec3Swizzles, Vec4Swizzles},
     prelude::*,
     sprite::{Anchor, MaterialMesh2dBundle, Mesh2dHandle},
     text::{BreakLineOn, Text2dBounds},
     utils::HashMap,
 };
 use core::hash::Hasher;
-use std::{collections::hash_map::DefaultHasher, f32::consts::PI, hash::Hash};
+use std::{collections::hash_map::DefaultHasher, hash::Hash};
 
 use crate::{
-    hash::hash_color,
     pico::{get_bbox, Drag, Pico, Pico2dCamera, StateItem},
+    rectangle_material::RectangleMaterial,
     MeshHandles, SwapMaterialEntity,
 };
 
@@ -27,7 +27,7 @@ pub const MINOR_DEPTH_AUTO_STEP: f32 = 0.0000001;
 #[allow(clippy::too_many_arguments)]
 pub fn render(
     mut commands: Commands,
-    mut materials: ResMut<Assets<ColorMaterial>>,
+    mut materials: ResMut<Assets<RectangleMaterial>>,
     mesh_handles: Res<MeshHandles>,
     time: Res<Time>,
     camera: Query<(&Camera, &GlobalTransform), With<Pico2dCamera>>,
@@ -147,7 +147,7 @@ pub fn render(
             }
         }
     }
-    let mut cached_materials = ColorMaterialCache::default();
+    let mut cached_materials = MaterialCache::default();
 
     // It seems that we need to add things in z order for them to show up in that order initially
     for (item, item_pos) in items.iter_mut().zip(item_positions.iter()) {
@@ -158,16 +158,11 @@ pub fn render(
         } else {
             true
         };
+        let material = pico.get_rect_material(&item);
+
         if generate || pico.window_size != window_size {
-            let mut corner_radius =
-                pico.valp_y(item.style.corner_radius, item.get_uv_size()) * window_size.y;
             let size = item.get_uv_size() * window_size;
             let font_size = pico.valp_y(item.style.font_size, item.get_uv_size()) * window_size.y;
-            let border_width =
-                pico.valp_y(item.style.border_width, item.get_uv_size()) * window_size.y;
-            let border_width_x2 = border_width * 2.0;
-
-            corner_radius = corner_radius.min(size.x).min(size.y);
 
             let state_item = if let Some(old_state_item) = pico.state.get_mut(&spatial_id) {
                 let entity = old_state_item.entity.unwrap();
@@ -206,14 +201,7 @@ pub fn render(
                     ..default()
                 });
 
-                let material_handle = cached_materials.get(
-                    item.style.background_color,
-                    item.style.image.clone(),
-                    &mut materials,
-                );
-                let border_material_handle =
-                    cached_materials.get(item.style.border_color, None, &mut materials);
-                let using_border = item.style.border_color.a() > 0.0 && border_width > 0.0;
+                let material_handle = cached_materials.get(material, &mut materials);
 
                 entity.with_children(|builder| {
                     let item_anchor_vec = item.get_anchor().as_vec();
@@ -222,31 +210,15 @@ pub fn render(
                         || item.style.image.is_some()
                     {
                         let anchor_trans = (-item_anchor_vec * size).extend(0.0);
-                        generate_rect_entities(
-                            corner_radius,
-                            builder,
-                            &mesh_handles,
-                            if using_border {
-                                border_material_handle
-                            } else {
-                                material_handle.clone()
-                            },
-                            anchor_trans,
-                            size,
-                            0.0,
-                            item.style.material,
-                        );
-                        if using_border && border_width_x2 < size.x && border_width_x2 < size.y {
-                            generate_rect_entities(
-                                corner_radius,
-                                builder,
-                                &mesh_handles,
-                                material_handle,
-                                anchor_trans,
-                                size - Vec2::splat(border_width_x2),
-                                MINOR_DEPTH_AUTO_STEP,
-                                item.style.material,
-                            );
+                        let mut entity = builder.spawn(MaterialMesh2dBundle {
+                            mesh: Mesh2dHandle(mesh_handles.rect.clone_weak()),
+                            material: material_handle.clone(),
+                            transform: Transform::from_translation(anchor_trans)
+                                .with_scale(size.extend(1.0)),
+                            ..default()
+                        });
+                        if let Some(material) = item.style.material {
+                            entity.insert(SwapMaterialEntity(material));
                         }
                     }
 
@@ -313,119 +285,26 @@ pub fn render(
 }
 
 #[derive(Default)]
-struct ColorMaterialCache(HashMap<u64, Handle<ColorMaterial>>);
+struct MaterialCache(HashMap<u64, Handle<RectangleMaterial>>);
 
-impl ColorMaterialCache {
+impl MaterialCache {
     fn get(
         &mut self,
-        color: Color,
-        image: Option<Handle<Image>>,
-        materials: &mut Assets<ColorMaterial>,
-    ) -> Handle<ColorMaterial> {
+        material: Option<RectangleMaterial>,
+        materials: &mut Assets<RectangleMaterial>,
+    ) -> Handle<RectangleMaterial> {
+        let material = material.unwrap_or_default(); //TODO make actual default material
         let hasher = &mut DefaultHasher::new();
-        hash_color(&color, hasher);
-        if let Some(image) = &image {
-            image.id().hash(hasher);
-            1234i32.hash(hasher);
-        }
+        material.hash(hasher);
         let mat_hash = hasher.finish();
 
         let material_handle = if let Some(handle) = self.0.get(&mat_hash) {
             handle.clone()
         } else {
-            let handle = materials.add(ColorMaterial {
-                color,
-                texture: image.clone(),
-            });
+            let handle = materials.add(material);
             self.0.insert(mat_hash, handle.clone());
             handle
         };
         material_handle
-    }
-}
-
-fn generate_rect_entities(
-    corner_radius: f32,
-    builder: &mut ChildBuilder,
-    mesh_handles: &MeshHandles,
-    material_handle: Handle<ColorMaterial>,
-    anchor_trans: Vec3,
-    size: Vec2,
-    depth_bias: f32,
-    material: Option<Entity>,
-) {
-    let anchor_trans = anchor_trans + vec3(0.0, 0.0, depth_bias);
-    if corner_radius <= 0.0 {
-        let mut entity = builder.spawn(MaterialMesh2dBundle {
-            mesh: Mesh2dHandle(mesh_handles.rect.clone_weak()),
-            material: material_handle.clone(),
-            transform: Transform::from_translation(anchor_trans).with_scale(size.extend(1.0)),
-            ..default()
-        });
-        if let Some(material) = material {
-            entity.insert(SwapMaterialEntity(material));
-        }
-    } else {
-        let cr2 = corner_radius * 2.0;
-        // Don't bother making rectangles if corner_radius just results in circle
-        if corner_radius < size.x && corner_radius < size.y {
-            // Make cross shape with gaps for the arcs
-            let mut entity = builder.spawn(MaterialMesh2dBundle {
-                mesh: Mesh2dHandle(mesh_handles.rect.clone_weak()),
-                material: material_handle.clone(),
-                transform: Transform::from_translation(anchor_trans)
-                    .with_scale((size - vec2(cr2, 0.0)).extend(1.0)),
-                ..default()
-            });
-            if let Some(material) = material {
-                entity.insert(SwapMaterialEntity(material));
-            }
-            // Don't bother making side rectangles if corner_radius just results in half circles on the ends
-            if corner_radius < size.y {
-                let s = vec2(corner_radius, size.y - cr2).extend(1.0);
-                let off = vec3((size.x - corner_radius) * 0.5, 0.0, 0.0);
-                let mut entity = builder.spawn(MaterialMesh2dBundle {
-                    mesh: Mesh2dHandle(mesh_handles.rect.clone_weak()),
-                    material: material_handle.clone_weak(),
-                    transform: Transform::from_translation(anchor_trans + off).with_scale(s),
-                    ..default()
-                });
-                if let Some(material) = material {
-                    entity.insert(SwapMaterialEntity(material));
-                }
-                let mut entity = builder.spawn(MaterialMesh2dBundle {
-                    mesh: Mesh2dHandle(mesh_handles.rect.clone_weak()),
-                    material: material_handle.clone_weak(),
-                    transform: Transform::from_translation(anchor_trans - off).with_scale(s),
-                    ..default()
-                });
-                if let Some(material) = material {
-                    entity.insert(SwapMaterialEntity(material));
-                }
-            }
-        }
-        // Add arcs for corners
-        for (offset, angle) in [
-            (size - cr2, 0.0),
-            (vec2(0.0, size.y - cr2), PI * 0.5),
-            (vec2(0.0, 0.0), PI),
-            (vec2(size.x - cr2, 0.0), PI * 1.5),
-        ] {
-            let offset = offset + corner_radius;
-            let mut entity = builder.spawn(MaterialMesh2dBundle {
-                mesh: Mesh2dHandle(mesh_handles.circle.clone_weak()),
-                material: material_handle.clone_weak(),
-                transform: Transform::from_translation(
-                    (anchor_trans.xy() + offset - size * 0.5)
-                        .extend(MINOR_DEPTH_AUTO_STEP + depth_bias),
-                )
-                .with_scale(Vec3::splat(corner_radius))
-                .with_rotation(Quat::from_rotation_z(angle)),
-                ..default()
-            });
-            if let Some(material) = material {
-                entity.insert(SwapMaterialEntity(material));
-            }
-        }
     }
 }

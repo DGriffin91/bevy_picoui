@@ -1,4 +1,3 @@
-use arc_mesh::generate_arc_mesh;
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
     ecs::system::Command,
@@ -8,14 +7,15 @@ use bevy::{
     sprite::{Material2d, Mesh2dHandle},
 };
 use pico::{MaterialHandleEntity, Pico};
+use rectangle_material::RectangleMaterialPlugin;
 use renderer::render;
-use std::{f32::consts::FRAC_PI_2, marker::PhantomData};
+use std::marker::PhantomData;
 
-pub mod arc_mesh;
 pub mod guard;
 pub mod hash;
 pub mod palette;
 pub mod pico;
+pub mod rectangle_material;
 pub mod renderer;
 pub mod widgets;
 
@@ -30,7 +30,8 @@ pub struct CreateDefaultCamWithOrder(isize);
 
 impl Plugin for PicoPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Pico>()
+        app.add_plugins(RectangleMaterialPlugin)
+            .init_resource::<Pico>()
             .add_systems(
                 PreUpdate,
                 (render.after(InputSystem), apply_deferred).chain(),
@@ -45,19 +46,12 @@ impl Plugin for PicoPlugin {
 
 #[derive(Resource)]
 pub struct MeshHandles {
-    circle: Handle<Mesh>,
     rect: Handle<Mesh>,
 }
 
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
-    let arc_mesh = generate_arc_mesh(12, 1.0, 0.0, FRAC_PI_2);
-    let circle: Mesh2dHandle = meshes.add(arc_mesh).into();
     let rect: Mesh2dHandle = meshes.add(shape::Quad::new(vec2(1.0, 1.0)).into()).into();
-
-    commands.insert_resource(MeshHandles {
-        circle: circle.0,
-        rect: rect.0,
-    });
+    commands.insert_resource(MeshHandles { rect: rect.0 });
 }
 
 fn setup_2d_camera(mut commands: Commands, order: Res<CreateDefaultCamWithOrder>) {

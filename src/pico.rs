@@ -2,6 +2,7 @@ use bevy::{
     ecs::system::SystemParam,
     math::{vec2, vec4, Vec4Swizzles},
     prelude::*,
+    render::render_resource::BlendState,
     sprite::{Anchor, Material2d},
     text::DEFAULT_FONT_HANDLE,
     utils::{label::DynHash, HashMap},
@@ -13,6 +14,7 @@ use std::collections::hash_map::DefaultHasher;
 use crate::{
     guard::Guard,
     hash::{hash_anchor, hash_color, hash_val, hash_vec2, hash_vec3, hash_vec4},
+    rectangle_material::{RectangleMaterial, RectangleMaterialUniform},
     renderer::MAJOR_DEPTH_AUTO_STEP,
 };
 
@@ -643,6 +645,33 @@ impl Pico {
             }
         }
         None
+    }
+
+    pub fn get_rect_material(&mut self, item: &ProcessedPicoItem) -> Option<RectangleMaterial> {
+        if item.style.material.is_some() {
+            // Custom material is being used.
+            return None;
+        }
+        let corner_radius =
+            self.valp_y(item.style.corner_radius, item.get_uv_size()) * self.window_size.y;
+        let border_width =
+            self.valp_y(item.style.border_width, item.get_uv_size()) * self.window_size.y;
+        let material = RectangleMaterial {
+            material_settings: RectangleMaterialUniform {
+                corner_radius,
+                edge_softness: 1.0,
+                border_thickness: border_width,
+                border_softness: 1.0,
+                border_color: item.style.border_color.as_linear_rgba_f32().into(),
+                background_color1: item.style.background_color.as_linear_rgba_f32().into(),
+                background_color2: item.style.background_color.as_linear_rgba_f32().into(),
+                background_mat: Transform::from_translation(Vec3::ZERO).compute_matrix(),
+                flags: if item.style.image.is_some() { 1 } else { 0 },
+            },
+            texture: item.style.image.clone(),
+            blend_state: Some(BlendState::ALPHA_BLENDING),
+        };
+        Some(material)
     }
 }
 
