@@ -1,4 +1,4 @@
-use bevy::{prelude::*, sprite::Anchor};
+use bevy::{math::vec3, prelude::*, sprite::Anchor};
 
 use bevy_picoui::{
     palette::RGB_PALETTE,
@@ -51,7 +51,7 @@ fn update(
         ..default()
     });
 
-    pico.add(PicoItem {
+    let pic_index = pico.add(PicoItem {
         width: Val::Percent(80.0),
         height: Val::Percent(80.0),
         style: ItemStyle {
@@ -65,4 +65,9 @@ fn update(
         parent: Some(bg),
         ..default()
     });
+    if pico.hovered(&pic_index) {
+        let style = &mut pico.get_mut(&pic_index).style;
+        style.background_uv_transform = Transform::from_scale(vec3(0.97, 0.97, 0.97));
+        style.background_color = Color::rgb(1.2, 1.2, 1.2);
+    }
 }

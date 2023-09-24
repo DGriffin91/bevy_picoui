@@ -40,6 +40,7 @@ pub struct ItemStyle {
     pub background_color: Color,
     /// The gradient is added to the background_color, use Color::None on one or the other if color mixing is not desired.
     pub background_gradient: (Color, Color),
+    pub background_uv_transform: Transform,
     pub anchor_text: Anchor,
     pub text_alignment: TextAlignment,
     pub material: Option<Entity>,
@@ -61,6 +62,7 @@ impl Default for ItemStyle {
             text_color: Color::WHITE,
             background_color: Color::NONE,
             background_gradient: (Color::NONE, Color::NONE),
+            background_uv_transform: Transform::default(),
             text_alignment: TextAlignment::Center,
             anchor_text: Anchor::Center,
             material: None,
@@ -107,6 +109,13 @@ impl Hash for ItemStyle {
         hash_color(&self.background_color, state);
         hash_color(&self.background_gradient.0, state);
         hash_color(&self.background_gradient.1, state);
+        if self.background_uv_transform != Transform::default() {
+            let mat = self.background_uv_transform.compute_matrix();
+            hash_vec4(&mat.x_axis, state);
+            hash_vec4(&mat.y_axis, state);
+            hash_vec4(&mat.z_axis, state);
+            hash_vec4(&mat.w_axis, state);
+        }
         self.text_alignment.hash(state);
         hash_anchor(&self.anchor_text, state);
         if let Some(entity) = self.material {
@@ -366,7 +375,7 @@ impl Pico {
         self.stack_guard.clone()
     }
 
-    pub fn get_hovered(&self, index: &ItemIndex) -> Option<&StateItem> {
+    fn get_hovered(&self, index: &ItemIndex) -> Option<&StateItem> {
         if let Some(state_item) = self.get_state(index) {
             if state_item.hover {
                 return Some(state_item);
@@ -674,7 +683,7 @@ impl Pico {
                 background_color2: (item.style.background_gradient.1 + item.style.background_color)
                     .as_linear_rgba_f32()
                     .into(),
-                background_mat: Transform::from_translation(Vec3::ZERO).compute_matrix(),
+                background_mat: item.style.background_uv_transform.compute_matrix(),
                 flags: if item.style.image.is_some() { 1 } else { 0 },
             },
             texture: item.style.image.clone(),

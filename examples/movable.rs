@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use bevy::{math::*, prelude::*, sprite::Anchor};
 
 use bevy_picoui::{
@@ -34,7 +36,8 @@ fn update(mut pico: ResMut<Pico>, mut position: Local<Option<Vec2>>) {
             corner_radius: Val::Vh(3.0),
             border_width: Val::Px(1.0),
             border_color: Color::WHITE,
-            background_color: Color::WHITE * 0.2,
+            background_gradient: (RGB_PALETTE[0][0] * 0.8, RGB_PALETTE[0][2]),
+            background_uv_transform: Transform::from_rotation(Quat::from_rotation_z(PI * 0.25)),
             ..default()
         },
         anchor: Anchor::Center,
@@ -70,7 +73,7 @@ fn update(mut pico: ResMut<Pico>, mut position: Local<Option<Vec2>>) {
             corner_radius: Val::Vh(3.0),
             border_width: Val::Vh(0.1),
             border_color: Color::WHITE,
-            background_color: RGB_PALETTE[2][3],
+            background_color: RGB_PALETTE[0][3],
             ..default()
         },
         parent: Some(main_box),
