@@ -201,14 +201,15 @@ pub fn render(
                     ..default()
                 });
 
-                let material_handle = cached_materials.get(material, &mut materials);
-
                 entity.with_children(|builder| {
                     let item_anchor_vec = item.get_anchor().as_vec();
                     if item.style.background_color.a() > 0.0
+                        || item.style.background_gradient.0.a() > 0.0
+                        || item.style.background_gradient.1.a() > 0.0
                         || item.style.material.is_some()
                         || item.style.image.is_some()
                     {
+                        let material_handle = cached_materials.get(material, &mut materials);
                         let anchor_trans = (-item_anchor_vec * size).extend(0.0);
                         let mut entity = builder.spawn(MaterialMesh2dBundle {
                             mesh: Mesh2dHandle(mesh_handles.rect.clone_weak()),

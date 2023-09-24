@@ -44,7 +44,7 @@ pub fn toggle_button(
         c = enabled_bg;
     }
     pico.get_mut(&index).style.background_color = if pico.hovered(&index) {
-        c + Vec4::splat(0.06)
+        c + Vec4::splat(0.08)
     } else {
         c
     };

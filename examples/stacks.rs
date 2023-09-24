@@ -28,10 +28,6 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
         width: Val::Vh(70.0),
         height: Val::Vh(50.0),
         anchor: Anchor::Center,
-        style: ItemStyle {
-            background_color: Color::WHITE * 0.2,
-            ..default()
-        },
         ..default()
     });
 
@@ -43,7 +39,7 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
                 width: Val::Percent(100.0),
                 height: Val::Percent(9.0),
                 style: ItemStyle {
-                    background_color: RGB_PALETTE[1][1],
+                    background_gradient: (RGB_PALETTE[1][1] * 0.3, RGB_PALETTE[1][0] * 0.8),
                     ..default()
                 },
                 anchor: Anchor::TopLeft,
@@ -61,14 +57,15 @@ fn update(mut pico: ResMut<Pico>, mut toggle_states: Local<[[bool; 10]; 10]>) {
                             height: Val::Percent(80.0),
                             style: ItemStyle {
                                 corner_radius: Val::Percent(50.0),
-                                background_color: RGB_PALETTE[1][4],
+                                background_gradient: (RGB_PALETTE[1][4], RGB_PALETTE[1][1]),
                                 ..default()
                             },
                             anchor: Anchor::CenterLeft,
                             parent: Some(lane),
                             ..default()
                         },
-                        RGB_PALETTE[1][4] + Color::DARK_GRAY,
+                        // This color will be added to the existing gradient.
+                        Color::rgb(0.25, 0.25, 0.25),
                         toggle_state,
                     );
                 }

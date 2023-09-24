@@ -42,7 +42,7 @@ fn fragment(in: MeshVertexOutput) -> @location(0) vec4<f32> {
 
     let bg_uv = (m.background_mat * vec4(in.uv - 0.5, 0.0, 1.0)).xy + 0.5;
 
-    var background_color = mix(m.background_color1, m.background_color2, bg_uv.x);
+    var background_color = mix(m.background_color1, m.background_color2, bg_uv.y);
 
 
     if ((m.flags & MATERIAL_FLAGS_TEXTURE_BIT) != 0u) {
@@ -72,7 +72,7 @@ fn fragment(in: MeshVertexOutput) -> @location(0) vec4<f32> {
     let border_alpha = a * b;
 
     var color = background_color;
-    color *= main_alpha;
+    color.a *= main_alpha;
     color = mix(color, m.border_color, border_alpha * f32(m.border_thickness > 0.0));
 
     return color;

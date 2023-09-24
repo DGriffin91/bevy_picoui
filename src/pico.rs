@@ -38,6 +38,8 @@ pub struct ItemStyle {
     pub font: Handle<Font>,
     pub text_color: Color,
     pub background_color: Color,
+    /// The gradient is added to the background_color, use Color::None on one or the other if color mixing is not desired.
+    pub background_gradient: (Color, Color),
     pub anchor_text: Anchor,
     pub text_alignment: TextAlignment,
     pub material: Option<Entity>,
@@ -58,6 +60,7 @@ impl Default for ItemStyle {
             font: DEFAULT_FONT_HANDLE.typed(),
             text_color: Color::WHITE,
             background_color: Color::NONE,
+            background_gradient: (Color::NONE, Color::NONE),
             text_alignment: TextAlignment::Center,
             anchor_text: Anchor::Center,
             material: None,
@@ -102,6 +105,8 @@ impl Hash for ItemStyle {
         self.font.hash(state);
         hash_color(&self.text_color, state);
         hash_color(&self.background_color, state);
+        hash_color(&self.background_gradient.0, state);
+        hash_color(&self.background_gradient.1, state);
         self.text_alignment.hash(state);
         hash_anchor(&self.anchor_text, state);
         if let Some(entity) = self.material {
@@ -663,8 +668,12 @@ impl Pico {
                 border_thickness: border_width,
                 border_softness: 1.0,
                 border_color: item.style.border_color.as_linear_rgba_f32().into(),
-                background_color1: item.style.background_color.as_linear_rgba_f32().into(),
-                background_color2: item.style.background_color.as_linear_rgba_f32().into(),
+                background_color1: (item.style.background_gradient.0 + item.style.background_color)
+                    .as_linear_rgba_f32()
+                    .into(),
+                background_color2: (item.style.background_gradient.1 + item.style.background_color)
+                    .as_linear_rgba_f32()
+                    .into(),
                 background_mat: Transform::from_translation(Vec3::ZERO).compute_matrix(),
                 flags: if item.style.image.is_some() { 1 } else { 0 },
             },
