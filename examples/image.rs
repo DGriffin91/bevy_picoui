@@ -1,8 +1,4 @@
-use bevy::{
-    math::{vec3, vec4},
-    prelude::*,
-    sprite::Anchor,
-};
+use bevy::{math::vec3, prelude::*, sprite::Anchor};
 
 use bevy_picoui::{
     palette::RGB_PALETTE,

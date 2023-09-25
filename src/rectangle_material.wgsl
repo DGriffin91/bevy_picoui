@@ -77,5 +77,6 @@ fn fragment(in: MeshVertexOutput) -> @location(0) vec4<f32> {
     var premult_src = vec4(m.border_color.rgb * border_alpha, border_alpha);
 
     // PREMULTIPLIED_ALPHA_BLENDING, BlendComponent::OVER
-    return (1.0 * premult_src) + ((1.0 - premult_src.a) * premult_dst);
+    color = (1.0 * premult_src) + ((1.0 - premult_src.a) * premult_dst);
+    return color;
 }

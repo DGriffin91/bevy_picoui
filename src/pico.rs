@@ -51,6 +51,7 @@ pub struct ItemStyle {
     pub material: Option<Entity>,
     /// For image to be fully opaque with the correct colors, the background needs to be white.
     pub image: Option<Handle<Image>>,
+    pub blend_state: Option<BlendState>,
 }
 
 impl Default for ItemStyle {
@@ -77,6 +78,7 @@ impl Default for ItemStyle {
             anchor_text: Anchor::Center,
             material: None,
             image: None,
+            blend_state: Some(BlendState::ALPHA_BLENDING),
         }
     }
 }
@@ -140,6 +142,7 @@ impl Hash for ItemStyle {
         if let Some(image) = &self.image {
             image.id().dyn_hash(state);
         }
+        self.blend_state.hash(state);
     }
 }
 
@@ -717,7 +720,7 @@ impl Pico {
                 flags: if item.style.image.is_some() { 1 } else { 0 },
             },
             texture: item.style.image.clone(),
-            blend_state: Some(BlendState::ALPHA_BLENDING),
+            blend_state: item.style.blend_state,
         };
         Some(material)
     }
