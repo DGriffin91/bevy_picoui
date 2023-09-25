@@ -53,9 +53,6 @@ fn fragment(in: MeshVertexOutput) -> @location(0) vec4<f32> {
     border_thickness = max(border_thickness - m.border_softness, 0.0);
     let main_softness_offset = (max(m.border_softness, m.edge_softness));
 
-    // When the border or rect is softened we need to make the whole thing smaller to fit in the rect
-    let softness_offset = max(m.border_softness, m.edge_softness);
-
     // mesh is 1x1 so the x and y scale is the full size of the rect
     let size = vec2(mesh.model[0][0], mesh.model[1][1]); 
 
@@ -67,13 +64,18 @@ fn fragment(in: MeshVertexOutput) -> @location(0) vec4<f32> {
     var distance = rounded_box_sdf(pos - (size / 2.0), size / 2.0, r);
 
     let main_alpha = 1.0 - smoothstep(0.0, m.edge_softness, distance + main_softness_offset); 
-    let a = 1.0 - smoothstep(0.0, m.border_softness, -distance - border_thickness - softness_offset);
-    let b = 1.0 - smoothstep(0.0, m.border_softness, distance + softness_offset);
-    let border_alpha = a * b;
+    let a = 1.0 - smoothstep(0.0, m.border_softness, -distance - border_thickness - m.border_softness);
+    let b = 1.0 - smoothstep(0.0, m.border_softness, distance + m.border_softness);
+    let border_alpha = saturate(a * b * f32(m.border_thickness > 0.0));
 
     var color = background_color;
     color.a *= main_alpha;
-    color = mix(color, m.border_color, border_alpha * f32(m.border_thickness > 0.0));
 
-    return color;
+    //color = mix(color, m.border_color, border_alpha);
+
+    var premult_dst = vec4(color.rgb * color.a, color.a);
+    var premult_src = vec4(m.border_color.rgb * border_alpha, border_alpha);
+
+    // PREMULTIPLIED_ALPHA_BLENDING, BlendComponent::OVER
+    return (1.0 * premult_src) + ((1.0 - premult_src.a) * premult_dst);
 }

@@ -37,6 +37,7 @@ pub struct ItemStyle {
     pub multi_corner_radius: (Val, Val, Val, Val),
     pub border_width: Val,
     pub border_color: Color,
+    pub border_softness: Val,
     pub font_size: Val,
     pub font: Handle<Font>,
     pub text_color: Color,
@@ -44,6 +45,7 @@ pub struct ItemStyle {
     /// The gradient is added to the `background_color`, use Color::None on one or the other if color mixing is not desired.
     pub background_gradient: (Color, Color),
     pub background_uv_transform: Transform,
+    pub edge_softness: Val,
     pub anchor_text: Anchor,
     pub text_alignment: TextAlignment,
     pub material: Option<Entity>,
@@ -63,11 +65,13 @@ impl Default for ItemStyle {
             ),
             border_width: Val::default(),
             border_color: Color::BLACK,
+            border_softness: Val::Px(1.0),
             font_size: Val::Vh(2.0),
             font: DEFAULT_FONT_HANDLE.typed(),
             text_color: Color::WHITE,
             background_color: Color::NONE,
             background_gradient: (Color::NONE, Color::NONE),
+            edge_softness: Val::Px(1.0),
             background_uv_transform: Transform::default(),
             text_alignment: TextAlignment::Center,
             anchor_text: Anchor::Center,
@@ -113,6 +117,7 @@ impl Hash for ItemStyle {
         hash_val(&self.multi_corner_radius.3, state);
         hash_val(&self.border_width, state);
         hash_color(&self.border_color, state);
+        hash_val(&self.border_softness, state);
         hash_val(&self.font_size, state);
         self.font.hash(state);
         hash_color(&self.text_color, state);
@@ -126,6 +131,7 @@ impl Hash for ItemStyle {
             hash_vec4(&mat.z_axis, state);
             hash_vec4(&mat.w_axis, state);
         }
+        hash_val(&self.edge_softness, state);
         self.text_alignment.hash(state);
         hash_anchor(&self.anchor_text, state);
         if let Some(entity) = self.material {
@@ -696,9 +702,10 @@ impl Pico {
                     corner_radius3 + corner_radius,
                     corner_radius0 + corner_radius,
                 ),
-                edge_softness: 1.0,
+                edge_softness: self.valp_y(item.style.edge_softness, uv_size) * self.window_size.y,
                 border_thickness: border_width,
-                border_softness: 1.0,
+                border_softness: self.valp_y(item.style.border_softness, uv_size)
+                    * self.window_size.y,
                 border_color: item.style.border_color.as_linear_rgba_f32().into(),
                 background_color1: (item.style.background_gradient.0 + item.style.background_color)
                     .as_linear_rgba_f32()

@@ -1,4 +1,8 @@
-use bevy::{math::vec3, prelude::*, sprite::Anchor};
+use bevy::{
+    math::{vec3, vec4},
+    prelude::*,
+    sprite::Anchor,
+};
 
 use bevy_picoui::{
     palette::RGB_PALETTE,
@@ -58,6 +62,10 @@ fn update(
             /// For image to be fully opaque with the correct colors, the background needs to be white.
             background_color: Color::WHITE,
             image: Some(image.clone()),
+            edge_softness: Val::Percent(25.0),
+            border_width: Val::Px(1.0),
+            border_color: RGB_PALETTE[0][3] * 2.0,
+            corner_radius: Val::Percent(50.0),
             ..default()
         },
         anchor: Anchor::Center,
@@ -68,6 +76,6 @@ fn update(
     if pico.hovered(&pic_index) {
         let style = &mut pico.get_mut(&pic_index).style;
         style.background_uv_transform = Transform::from_scale(vec3(0.97, 0.97, 0.97));
-        style.background_color = Color::rgb(1.2, 1.2, 1.2);
+        style.background_color = Color::rgb(1.3, 1.3, 1.3);
     }
 }
