@@ -214,8 +214,11 @@ pub fn render(
                         let mut entity = builder.spawn(MaterialMesh2dBundle {
                             mesh: Mesh2dHandle(mesh_handles.rect.clone_weak()),
                             material: material_handle.clone(),
-                            transform: Transform::from_translation(anchor_trans)
-                                .with_scale(size.extend(1.0)),
+                            transform: Transform::from_translation(
+                                anchor_trans + item.style.render_transform.translation,
+                            )
+                            .with_scale(size.extend(1.0) * item.style.render_transform.scale)
+                            .with_rotation(item.style.render_transform.rotation),
                             ..default()
                         });
                         if let Some(material) = item.style.material {
@@ -228,8 +231,11 @@ pub fn render(
                         text_anchor: item.style.anchor_text.clone(),
                         transform: Transform::from_translation(
                             (size * -(item_anchor_vec - item.style.anchor_text.as_vec()))
-                                .extend(0.0001),
-                        ),
+                                .extend(0.0001)
+                                + item.style.render_transform.translation,
+                        )
+                        .with_scale(item.style.render_transform.scale)
+                        .with_rotation(item.style.render_transform.rotation),
                         text_2d_bounds: Text2dBounds { size },
                         ..default()
                     });

@@ -46,7 +46,7 @@ fn update(
         width: Val::VMin(50.0),
         height: Val::VMin(50.0),
         style: ItemStyle {
-            corner_radius: Val::Px(10.0),
+            corner_radius: Val::Percent(3.0),
             border_width: Val::Px(1.0),
             border_color: Color::WHITE,
             background_color: RGB_PALETTE[1][0],
@@ -56,6 +56,31 @@ fn update(
         anchor_parent: Anchor::Center,
         ..default()
     });
+
+    for p in [
+        (-1.0, 0.0, 0.0, -1.0),
+        (0.0, -1.0, 1.0, 0.0),
+        (1.0, 0.0, 0.0, 1.0),
+        (0.0, 1.0, -1.0, 0.0),
+    ] {
+        pico.add_line(
+            PicoItem {
+                x: Val::Percent(98.0 * p.0),
+                y: Val::Percent(98.0 * p.1),
+                width: Val::Px(2.0),
+                anchor_parent: Anchor::Center,
+                style: ItemStyle {
+                    background_color: Color::WHITE,
+                    ..default()
+                },
+                parent: Some(main_box),
+                ..default()
+            },
+            Val::Percent(98.0 * p.2),
+            Val::Percent(98.0 * p.3),
+        );
+    }
+
     let mut points = Vec::new();
     for (i, parent_anchor) in [
         Anchor::Center,

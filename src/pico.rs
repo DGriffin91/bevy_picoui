@@ -45,6 +45,8 @@ pub struct ItemStyle {
     /// The gradient is added to the `background_color`, use Color::None on one or the other if color mixing is not desired.
     pub background_gradient: (Color, Color),
     pub background_uv_transform: Transform,
+    /// An additional transform applied only to rendering, does not affect children etc...
+    pub render_transform: Transform,
     pub edge_softness: Val,
     pub anchor_text: Anchor,
     pub text_alignment: TextAlignment,
@@ -74,6 +76,7 @@ impl Default for ItemStyle {
             background_gradient: (Color::NONE, Color::NONE),
             edge_softness: Val::Px(1.0),
             background_uv_transform: Transform::default(),
+            render_transform: Transform::default(),
             text_alignment: TextAlignment::Center,
             anchor_text: Anchor::Center,
             material: None,
@@ -128,6 +131,13 @@ impl Hash for ItemStyle {
         hash_color(&self.background_gradient.1, state);
         if self.background_uv_transform != Transform::default() {
             let mat = self.background_uv_transform.compute_matrix();
+            hash_vec4(&mat.x_axis, state);
+            hash_vec4(&mat.y_axis, state);
+            hash_vec4(&mat.z_axis, state);
+            hash_vec4(&mat.w_axis, state);
+        }
+        if self.render_transform != Transform::default() {
+            let mat = self.render_transform.compute_matrix();
             hash_vec4(&mat.x_axis, state);
             hash_vec4(&mat.y_axis, state);
             hash_vec4(&mat.z_axis, state);
@@ -570,13 +580,51 @@ impl Pico {
         ItemIndex(self.items.len() - 1)
     }
 
+    /// Uses x, y, and width from item along with args end_x, end_y to draw a line from
+    /// x, y to end_x, end_y with width.
+    /// Overrides height, anchor, and style.render_transform.rotation.
+    /// Respects parent and parent_anchor
+    pub fn add_line(&mut self, mut item: PicoItem, end_x: Val, end_y: Val) -> ItemIndex {
+        let parent_size = if let Some(parent) = item.parent {
+            let bbox = self.get(&parent).bbox;
+            (bbox.xy() - bbox.zw()).abs()
+        } else {
+            vec2(1.0, 1.0)
+        };
+        let p1 = item.uv_position
+            + vec2(
+                self.valp_x(item.x, parent_size) / parent_size.x,
+                self.valp_y(item.y, parent_size) / parent_size.y,
+            );
+        let p2 = vec2(
+            self.valp_x(end_x, parent_size) / parent_size.x,
+            self.valp_y(end_y, parent_size) / parent_size.y,
+        );
+        let center = (p1 + p2) * 0.5;
+        let length = p1.distance(p2);
+        let dir = (p2 - p1).normalize();
+        let angle = dir.x.atan2(dir.y);
+        item.uv_position = center;
+        item.anchor = Anchor::Center;
+        item.style.render_transform.rotation = Quat::from_rotation_z(angle);
+        item.uv_size = vec2(
+            item.uv_size.x + self.valp_x(item.width, parent_size) / parent_size.x,
+            length,
+        );
+        item.x = Val::DEFAULT;
+        item.y = Val::DEFAULT;
+        item.width = Val::DEFAULT;
+        item.height = Val::DEFAULT;
+        self.add(item)
+    }
+
     fn update_stack(&mut self) {
         while (self.stack_guard.get() as usize) < self.stack_stack.len() {
             self.stack_stack.pop();
         }
     }
 
-    // get scaled v of uv for val
+    // get scaled u of uv for val
     pub fn valp_x(&self, x: Val, parent_size: Vec2) -> f32 {
         match x {
             Val::Auto => 0.0,
@@ -593,7 +641,7 @@ impl Pico {
         }
     }
 
-    // get scaled u of uv for val
+    // get scaled v of uv for val
     pub fn valp_y(&self, y: Val, parent_size: Vec2) -> f32 {
         match y {
             Val::Auto => 0.0,

@@ -53,10 +53,15 @@ fn fragment(in: MeshVertexOutput) -> @location(0) vec4<f32> {
     border_thickness = max(border_thickness - m.border_softness, 0.0);
     let main_softness_offset = (max(m.border_softness, m.edge_softness));
 
-    // mesh is 1x1 so the x and y scale is the full size of the rect
-    let size = vec2(mesh.model[0][0], mesh.model[1][1]); 
+    let scaleX = length(mesh.model[0].xyz);
+    let scaleY = length(mesh.model[1].xyz);
+    let right = length(normalize(mesh.model[0].xyz));
+    let up = length(normalize(mesh.model[1].xyz));
 
-    let max_radius = min(size.x, size.y)* 0.5;
+    // mesh is 1x1 so the x and y scale is the full size of the rect
+    let size = vec2(scaleX / right, scaleY / up); 
+
+    let max_radius = min(size.x, size.y) * 0.5;
     let r = min(m.corner_radius, vec4(max_radius));
 
     let pos = in.uv.xy * size;
