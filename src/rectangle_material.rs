@@ -39,6 +39,7 @@ pub struct RectangleMaterialUniform {
     pub edge_softness: f32,
     pub border_thickness: f32,
     pub border_softness: f32,
+    pub nine_patch: Vec4,
     pub border_color: Vec4,
     pub background_color1: Vec4,
     pub background_color2: Vec4,

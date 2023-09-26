@@ -35,6 +35,9 @@ pub struct ItemStyle {
     /// `corner_radius` is added to `multi_corner_radius`, usually set one or the other.
     /// Order is clockwise: tl, tr, br, bl.
     pub multi_corner_radius: (Val, Val, Val, Val),
+    /// Optional margins for 9-patch content.
+    /// Units are pixels: Left, Top, Right, Bottom
+    pub nine_patch: Option<(u32, u32, u32, u32)>,
     pub border_width: Val,
     pub border_color: Color,
     pub border_softness: Val,
@@ -66,6 +69,7 @@ impl Default for ItemStyle {
                 Val::default(),
                 Val::default(),
             ),
+            nine_patch: None,
             border_width: Val::default(),
             border_color: Color::BLACK,
             border_softness: Val::Px(1.0),
@@ -120,6 +124,7 @@ impl Hash for ItemStyle {
         hash_val(&self.multi_corner_radius.1, state);
         hash_val(&self.multi_corner_radius.2, state);
         hash_val(&self.multi_corner_radius.3, state);
+        self.nine_patch.hash(state);
         hash_val(&self.border_width, state);
         hash_color(&self.border_color, state);
         hash_val(&self.border_softness, state);
@@ -744,6 +749,7 @@ impl Pico {
         let corner_radius3 =
             self.valp_y(item.style.multi_corner_radius.3, uv_size) * self.window_size.y;
         let border_width = self.valp_y(item.style.border_width, uv_size) * self.window_size.y;
+        let nine_patch = item.style.nine_patch.unwrap_or((0,0,0,0));
         let material = RectangleMaterial {
             material_settings: RectangleMaterialUniform {
                 // re-order for tl, tr, br, bl
@@ -757,6 +763,7 @@ impl Pico {
                 border_thickness: border_width,
                 border_softness: self.valp_y(item.style.border_softness, uv_size)
                     * self.window_size.y,
+                nine_patch: vec4(nine_patch.0 as f32, nine_patch.1 as f32,nine_patch.2 as f32,nine_patch.3 as f32),
                 border_color: item.style.border_color.as_linear_rgba_f32().into(),
                 background_color1: (item.style.background_gradient.0 + item.style.background_color)
                     .as_linear_rgba_f32()

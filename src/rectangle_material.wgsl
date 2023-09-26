@@ -13,6 +13,7 @@ struct CustomMaterial {
     edge_softness: f32,
     border_thickness: f32,
     border_softness: f32,
+    nine_patch: vec4<f32>,
     border_color: vec4<f32>,
     background_color1: vec4<f32>,
     background_color2: vec4<f32>,
@@ -45,9 +46,7 @@ fn fragment(in: MeshVertexOutput) -> @location(0) vec4<f32> {
     var background_color = mix(m.background_color1, m.background_color2, bg_uv.y);
 
 
-    if ((m.flags & MATERIAL_FLAGS_TEXTURE_BIT) != 0u) {
-        background_color = background_color * textureSample(texture, texture_sampler, bg_uv);
-    }
+
 
     // Softening the border makes it larger, compensate for that
     border_thickness = max(border_thickness - m.border_softness, 0.0);
@@ -61,6 +60,30 @@ fn fragment(in: MeshVertexOutput) -> @location(0) vec4<f32> {
     // mesh is 1x1 so the x and y scale is the full size of the rect
     let size = vec2(scaleX / right, scaleY / up); 
 
+    if ((m.flags & MATERIAL_FLAGS_TEXTURE_BIT) != 0u) {
+        if all(m.nine_patch == vec4(0.0)) {
+            background_color = background_color * textureSample(texture, texture_sampler, bg_uv);
+        } else {
+            let dims = vec2<f32>(textureDimensions(texture).xy);
+            var px = bg_uv * size;
+
+            let top_btm = m.nine_patch.x + m.nine_patch.z;
+            let right_left = m.nine_patch.y + m.nine_patch.w;
+            let xmod = min(dims.x - top_btm, size.x - top_btm);
+            let ymod = min(dims.y - right_left, size.y - right_left);
+
+            px.x = select(px.x, px.x % xmod + m.nine_patch.x, 
+                                px.x > m.nine_patch.x && px.x < size.x - m.nine_patch.z);
+            px.y = select(px.y, px.y % ymod + m.nine_patch.y, 
+                                px.y > m.nine_patch.y && px.y < size.y - m.nine_patch.w);
+
+            px.x = select(px.x, px.x - size.x + dims.x, px.x >= size.x - m.nine_patch.z);
+            px.y = select(px.y, px.y - size.y + dims.y, px.y >= size.y - m.nine_patch.w);
+
+            background_color = background_color * textureSample(texture, texture_sampler, px / dims);
+        }
+    }
+
     let max_radius = min(size.x, size.y) * 0.5;
     let r = min(m.corner_radius, vec4(max_radius));
 
@@ -73,15 +96,13 @@ fn fragment(in: MeshVertexOutput) -> @location(0) vec4<f32> {
     let b = 1.0 - smoothstep(0.0, m.border_softness, distance + m.border_softness);
     let border_alpha = saturate(a * b * f32(m.border_thickness > 0.0));
 
-    var color = background_color;
-    color.a *= main_alpha;
 
     //color = mix(color, m.border_color, border_alpha);
 
-    var premult_dst = vec4(color.rgb * color.a, color.a);
+    var premult_dst = background_color * main_alpha;
     var premult_src = vec4(m.border_color.rgb * border_alpha, border_alpha);
 
     // PREMULTIPLIED_ALPHA_BLENDING, BlendComponent::OVER
-    color = (1.0 * premult_src) + ((1.0 - premult_src.a) * premult_dst);
+    let color = (1.0 * premult_src) + ((1.0 - premult_src.a) * premult_dst);
     return color;
 }

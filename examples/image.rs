@@ -26,6 +26,7 @@ fn update(
     mut image: Local<Option<Handle<Image>>>,
 ) {
     if image.is_none() {
+        // For actual projects consider using https://github.com/NiklasEi/bevy_asset_loader or load assets in separate startup system
         *image = Some(
             asset_server
                 .load("images/generic-rpg-ui-inventario.png")
