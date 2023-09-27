@@ -50,7 +50,6 @@ fn fragment(in: MeshVertexOutput) -> @location(0) vec4<f32> {
 
     // Softening the border makes it larger, compensate for that
     border_thickness = max(border_thickness - m.border_softness, 0.0);
-    let main_softness_offset = (max(m.border_softness, m.edge_softness));
 
     let scaleX = length(mesh.model[0].xyz);
     let scaleY = length(mesh.model[1].xyz);
@@ -84,14 +83,21 @@ fn fragment(in: MeshVertexOutput) -> @location(0) vec4<f32> {
         }
     }
 
-    let max_radius = min(size.x, size.y) * 0.5;
-    let r = min(m.corner_radius, vec4(max_radius));
+    let min_edge = min(size.x, size.y);
+    let radius_limit = min_edge * 0.5;
+    let r = min(m.corner_radius, vec4(radius_limit));
+
+    // - r_off - 0.5 is to make boxes with sharp edges less shrunken
+    // TODO figure out a better way to tight pack rounded boxes
+    // Issue comes from using SDF AA trick
+    let r_off = (1.0 - saturate(max(max(max(r.x, r.y), r.z), r.w) * min_edge));
+    let main_softness_offset = max(max(m.border_softness, m.edge_softness), 0.0) - r_off - 0.5;
 
     let pos = in.uv.xy * size;
 
-    var distance = rounded_box_sdf(pos - (size / 2.0), size / 2.0, r);
+    var distance = rounded_box_sdf(pos - (size * 0.5), size * 0.5, r);
 
-    let main_alpha = 1.0 - smoothstep(0.0, m.edge_softness, distance + main_softness_offset); 
+    let main_alpha = 1.0 - smoothstep(0.0, m.edge_softness, distance + main_softness_offset);
     let a = 1.0 - smoothstep(0.0, m.border_softness, -distance - border_thickness - m.border_softness);
     let b = 1.0 - smoothstep(0.0, m.border_softness, distance + m.border_softness);
     let border_alpha = saturate(a * b * f32(m.border_thickness > 0.0));

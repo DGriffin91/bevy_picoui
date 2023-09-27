@@ -192,7 +192,7 @@ pub fn basic_drag_widget(
     char_input_events: &mut EventReader<ReceivedCharacter>,
     relative: bool,
 ) -> f32 {
-    let _guard = pico.hstack(Val::Percent(5.0), Val::Percent(1.0), &parent);
+    let _guard = pico.hstack(Val::Percent(5.0), Val::Percent(1.0), false, &parent);
     // Label Text
     pico.add(PicoItem {
         text: label.to_string(),
@@ -295,7 +295,7 @@ impl ScrollAreaWidget {
         }
 
         {
-            let _guard = pico.vstack(Val::Px(0.0), Val::Px(0.0), &scroll_widget);
+            let _guard = pico.vstack(Val::Px(0.0), Val::Px(0.0), false, &scroll_widget);
 
             if let Some(state) = pico.get_state_mut(&scroll_widget) {
                 if let Some(storage) = &mut state.storage {
@@ -306,7 +306,7 @@ impl ScrollAreaWidget {
             }
 
             {
-                let _guard = pico.hstack(Val::Px(0.0), Val::Px(0.0), &scroll_widget);
+                let _guard = pico.hstack(Val::Px(0.0), Val::Px(0.0), false, &scroll_widget);
                 content_area = pico.add(PicoItem {
                     width: Val::Percent(95.0),
                     height: Val::Percent(100.0),
@@ -324,7 +324,7 @@ impl ScrollAreaWidget {
                     ..default()
                 });
                 {
-                    let _guard = pico.vstack(Val::Px(0.0), Val::Px(0.0), &scroll_bar_area);
+                    let _guard = pico.vstack(Val::Px(0.0), Val::Px(0.0), false, &scroll_bar_area);
                     up_btn = pico.add(PicoItem {
                         width: Val::Percent(100.0),
                         height: Val::Percent(5.0),
@@ -408,7 +408,7 @@ impl ScrollAreaWidget {
                     fscroll_position = scroll_position as f32 / scroll_range as f32;
                 }
                 {
-                    let _guard = pico.vstack(Val::Px(0.0), Val::Px(0.0), &content_area);
+                    let _guard = pico.vstack(Val::Px(0.0), Val::Px(0.0), false, &content_area);
                     let scroll_position = scroll_position as usize;
                     for _ in scroll_position..scroll_position + max_items_to_show as usize {
                         items.push(pico.add(PicoItem {

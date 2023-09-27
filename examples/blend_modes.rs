@@ -77,7 +77,7 @@ fn update(
     };
 
     {
-        let _guard = pico.vstack(Val::Vh(1.0), Val::Vh(0.5), &controls);
+        let _guard = pico.vstack(Val::Vh(1.0), Val::Vh(0.5), false, &controls);
         *red = cdrag(&mut pico, RED, "Red", *red, false).clamp(0.0, 1.0);
         *green = cdrag(&mut pico, GREEN, "Green", *green, false).clamp(0.0, 1.0);
         *blue = cdrag(&mut pico, BLUE, "Blue", *blue, false).clamp(0.0, 1.0);

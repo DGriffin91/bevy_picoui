@@ -133,7 +133,7 @@ fn update(
     });
 
     {
-        let _guard = pico.vstack(Val::Percent(5.0), Val::Percent(5.0), &main_panel);
+        let _guard = pico.vstack(Val::Percent(5.0), Val::Percent(5.0), false, &main_panel);
 
         let btn_template = PicoItem {
             width: Val::Percent(100.0),

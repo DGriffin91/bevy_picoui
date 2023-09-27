@@ -72,7 +72,7 @@ impl Default for ItemStyle {
             nine_patch: None,
             border_width: Val::default(),
             border_color: Color::BLACK,
-            border_softness: Val::Px(1.0),
+            border_softness: Val::Px(0.5),
             font_size: Val::Vh(2.0),
             font: DEFAULT_FONT_HANDLE.typed(),
             text_color: Color::WHITE,
@@ -348,9 +348,11 @@ pub fn lerp(start: f32, end: f32, t: f32) -> f32 {
 
 #[derive(Clone, Copy, Default)]
 pub struct Stack {
+    // Unit for end and margin is u or v within parent
     pub end: f32,
     pub margin: f32,
     pub vertical: bool,
+    pub reverse: bool,
     pub bypass: bool,
 }
 
@@ -367,32 +369,34 @@ pub struct Pico {
 }
 
 impl Pico {
-    pub fn vstack(&mut self, start: Val, margin: Val, parent: &ItemIndex) -> Guard {
+    pub fn vstack(&mut self, start: Val, margin: Val, reverse: bool, parent: &ItemIndex) -> Guard {
         self.update_stack();
         let bbox = self.get(parent).bbox;
         let parent_size = (bbox.zw() - bbox.xy()).abs();
-        let start = self.valp_y(start, parent_size);
+        let start = self.valp_y(start, parent_size) * if reverse { -1.0 } else { 1.0 };
         let margin = self.valp_y(margin, parent_size);
         self.stack_stack.push(Stack {
             end: start,
             margin,
             vertical: true,
+            reverse,
             bypass: false,
         });
         self.stack_guard.push();
         self.stack_guard.clone()
     }
 
-    pub fn hstack(&mut self, start: Val, margin: Val, parent: &ItemIndex) -> Guard {
+    pub fn hstack(&mut self, start: Val, margin: Val, reverse: bool, parent: &ItemIndex) -> Guard {
         self.update_stack();
         let bbox = self.get(parent).bbox;
         let parent_size = (bbox.zw() - bbox.xy()).abs();
-        let start = self.valp_x(start, parent_size);
+        let start = self.valp_x(start, parent_size) * if reverse { -1.0 } else { 1.0 };
         let margin = self.valp_x(margin, parent_size);
         self.stack_stack.push(Stack {
             end: start,
             margin,
             vertical: false,
+            reverse,
             bypass: false,
         });
         self.stack_guard.push();
@@ -407,6 +411,16 @@ impl Pico {
         });
         self.stack_guard.push();
         self.stack_guard.clone()
+    }
+
+    /// Get the remaining stack for the current stack inside the stack's parent
+    /// Unit is u or v within the parent
+    pub fn remaining_stack_space(&self) -> f32 {
+        if let Some(stack) = self.stack_stack.last() {
+            1.0 - stack.end
+        } else {
+            1.0
+        }
     }
 
     fn get_hovered(&self, index: &ItemIndex) -> Option<&StateItem> {
@@ -545,7 +559,11 @@ impl Pico {
                         processed_item.uv_position,
                         &processed_item.anchor,
                     );
-                    stack.end = stack.end.max(bbox.w - parent_2d_bbox.y) + stack.margin;
+                    if stack.reverse {
+                        stack.end = stack.end.min(bbox.y - parent_2d_bbox.w) - stack.margin;
+                    } else {
+                        stack.end = stack.end.max(bbox.w - parent_2d_bbox.y) + stack.margin;
+                    }
                 } else {
                     processed_item.uv_position.x += stack.end;
                     let bbox = get_bbox(
@@ -553,7 +571,11 @@ impl Pico {
                         processed_item.uv_position,
                         &processed_item.anchor,
                     );
-                    stack.end = stack.end.max(bbox.z - parent_2d_bbox.x) + stack.margin;
+                    if stack.reverse {
+                        stack.end = stack.end.min(bbox.x - parent_2d_bbox.z) - stack.margin;
+                    } else {
+                        stack.end = stack.end.max(bbox.z - parent_2d_bbox.x) + stack.margin;
+                    }
                 }
             }
         }
@@ -749,7 +771,7 @@ impl Pico {
         let corner_radius3 =
             self.valp_y(item.style.multi_corner_radius.3, uv_size) * self.window_size.y;
         let border_width = self.valp_y(item.style.border_width, uv_size) * self.window_size.y;
-        let nine_patch = item.style.nine_patch.unwrap_or((0,0,0,0));
+        let nine_patch = item.style.nine_patch.unwrap_or((0, 0, 0, 0));
         let material = RectangleMaterial {
             material_settings: RectangleMaterialUniform {
                 // re-order for tl, tr, br, bl
@@ -763,7 +785,12 @@ impl Pico {
                 border_thickness: border_width,
                 border_softness: self.valp_y(item.style.border_softness, uv_size)
                     * self.window_size.y,
-                nine_patch: vec4(nine_patch.0 as f32, nine_patch.1 as f32,nine_patch.2 as f32,nine_patch.3 as f32),
+                nine_patch: vec4(
+                    nine_patch.0 as f32,
+                    nine_patch.1 as f32,
+                    nine_patch.2 as f32,
+                    nine_patch.3 as f32,
+                ),
                 border_color: item.style.border_color.as_linear_rgba_f32().into(),
                 background_color1: (item.style.background_gradient.0 + item.style.background_color)
                     .as_linear_rgba_f32()
