@@ -306,20 +306,19 @@ impl ScrollAreaWidget {
             }
 
             {
-                let _guard = pico.hstack(Val::Px(0.0), Val::Px(0.0), false, &scroll_widget);
-                content_area = pico.add(PicoItem {
-                    width: Val::Percent(95.0),
+                let _guard = pico.hstack(Val::Px(0.0), Val::Px(0.0), true, &scroll_widget);
+                scroll_bar_area = pico.add(PicoItem {
+                    width: Val::Vh(2.5),
                     height: Val::Percent(100.0),
-                    anchor_parent: Anchor::TopLeft,
-                    anchor: Anchor::TopLeft,
+                    anchor_parent: Anchor::TopRight,
+                    anchor: Anchor::TopRight,
                     parent: Some(scroll_widget),
                     ..default()
                 });
-                scroll_bar_area = pico.add(PicoItem {
-                    width: Val::Percent(5.0),
-                    height: Val::Percent(100.0),
-                    anchor_parent: Anchor::TopLeft,
-                    anchor: Anchor::TopLeft,
+                content_area = pico.add(PicoItem {
+                    uv_size: vec2(pico.remaining_stack_space(), 1.0),
+                    anchor_parent: Anchor::TopRight,
+                    anchor: Anchor::TopRight,
                     parent: Some(scroll_widget),
                     ..default()
                 });

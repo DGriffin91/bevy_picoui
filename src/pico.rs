@@ -354,6 +354,7 @@ pub struct Stack {
     pub vertical: bool,
     pub reverse: bool,
     pub bypass: bool,
+    pub parent: Option<ItemIndex>,
 }
 
 #[derive(Resource, Default)]
@@ -381,6 +382,7 @@ impl Pico {
             vertical: true,
             reverse,
             bypass: false,
+            parent: Some(*parent),
         });
         self.stack_guard.push();
         self.stack_guard.clone()
@@ -398,6 +400,7 @@ impl Pico {
             vertical: false,
             reverse,
             bypass: false,
+            parent: Some(*parent),
         });
         self.stack_guard.push();
         self.stack_guard.clone()
@@ -413,14 +416,23 @@ impl Pico {
         self.stack_guard.clone()
     }
 
-    /// Get the remaining stack for the current stack inside the stack's parent
-    /// Unit is u or v within the parent
+    /// Get the remaining stack for the current stack inside the stack's parent.
+    /// Unit is u or v within the parent.
     pub fn remaining_stack_space(&self) -> f32 {
         if let Some(stack) = self.stack_stack.last() {
-            1.0 - stack.end
-        } else {
-            1.0
+            if let Some(parent_index) = stack.parent {
+                let parent = self.get(&parent_index);
+                let parent_size = (parent.bbox.zw() - parent.bbox.xy()).abs();
+                return 1.0
+                    + if stack.reverse { stack.end } else { -stack.end }
+                        / if stack.vertical {
+                            parent_size.y
+                        } else {
+                            parent_size.x
+                        };
+            }
         }
+        1.0
     }
 
     fn get_hovered(&self, index: &ItemIndex) -> Option<&StateItem> {
@@ -510,7 +522,7 @@ impl Pico {
 
         processed_item.depth = item_depth.unwrap();
 
-        let parent_2d_bbox = if let Some(parent_index) = processed_item.parent {
+        let parent_bbox = if let Some(parent_index) = processed_item.parent {
             let parent = self.get_mut(&parent_index);
             parent.child_max_depth = parent.child_max_depth.max(processed_item.depth);
             self.get(&parent_index).bbox
@@ -518,7 +530,7 @@ impl Pico {
             vec4(0.0, 0.0, 1.0, 1.0)
         };
 
-        let parent_size = (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
+        let parent_size = (parent_bbox.zw() - parent_bbox.xy()).abs();
 
         let vx = self.valp_x(item_x, parent_size) / parent_size.x;
         let vy = self.valp_y(item_y, parent_size) / parent_size.y;
@@ -541,12 +553,12 @@ impl Pico {
         processed_item.uv_position += uv_position;
 
         processed_item.uv_position = lerp2(
-            parent_2d_bbox.xy(),
-            parent_2d_bbox.zw(),
+            parent_bbox.xy(),
+            parent_bbox.zw(),
             processed_item.uv_position,
         );
         processed_item.uv_size += vec2(vw, vh);
-        processed_item.uv_size *= (parent_2d_bbox.zw() - parent_2d_bbox.xy()).abs();
+        processed_item.uv_size *= (parent_bbox.zw() - parent_bbox.xy()).abs();
 
         self.update_stack();
         if !self.stack_stack.is_empty() && processed_item.parent.is_some() {
@@ -560,9 +572,9 @@ impl Pico {
                         &processed_item.anchor,
                     );
                     if stack.reverse {
-                        stack.end = stack.end.min(bbox.y - parent_2d_bbox.w) - stack.margin;
+                        stack.end = stack.end.min(bbox.y - parent_bbox.w) - stack.margin;
                     } else {
-                        stack.end = stack.end.max(bbox.w - parent_2d_bbox.y) + stack.margin;
+                        stack.end = stack.end.max(bbox.w - parent_bbox.y) + stack.margin;
                     }
                 } else {
                     processed_item.uv_position.x += stack.end;
@@ -572,9 +584,9 @@ impl Pico {
                         &processed_item.anchor,
                     );
                     if stack.reverse {
-                        stack.end = stack.end.min(bbox.x - parent_2d_bbox.z) - stack.margin;
+                        stack.end = stack.end.min(bbox.x - parent_bbox.z) - stack.margin;
                     } else {
-                        stack.end = stack.end.max(bbox.z - parent_2d_bbox.x) + stack.margin;
+                        stack.end = stack.end.max(bbox.z - parent_bbox.x) + stack.margin;
                     }
                 }
             }

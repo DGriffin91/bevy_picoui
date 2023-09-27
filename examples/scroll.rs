@@ -56,8 +56,25 @@ fn update(mut pico: ResMut<Pico>, mut mouse_wheel_events: EventReader<MouseWheel
         ..default()
     };
 
-    pico.get_mut(&scroll.up_btn).text = "^".to_string();
-    pico.get_mut(&scroll.down_btn).text = "v".to_string();
+    let circle = PicoItem {
+        width: Val::Percent(25.0),
+        height: Val::Percent(25.0),
+        anchor: Anchor::Center,
+        anchor_parent: Anchor::Center,
+        style: ItemStyle {
+            corner_radius: Val::Percent(50.0),
+            background_color: Color::rgba(1.0, 1.0, 1.0, 0.1),
+            ..default()
+        },
+        parent: Some(scroll.up_btn),
+        ..default()
+    };
+
+    let mut circle2 = circle.clone();
+    circle2.parent = Some(scroll.down_btn);
+
+    pico.add(circle);
+    pico.add(circle2);
 
     for (i, index) in scroll.items.iter().enumerate() {
         let (i, j) = indices[i + scroll.position as usize];
