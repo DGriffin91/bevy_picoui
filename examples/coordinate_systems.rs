@@ -133,7 +133,7 @@ fn setup(
             ExampleCamera,
             RenderLayers::layer(0).with(1),
             Visibility::Visible,
-            ComputedVisibility::default(),
+            InheritedVisibility::default(),
         ))
         .with_children(|builder| {
             // Post processing 2d quad, with material using the render texture done by the main camera, with a custom shader.

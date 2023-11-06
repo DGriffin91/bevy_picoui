@@ -1,10 +1,10 @@
 
-#import bevy_sprite::mesh2d_vertex_output  MeshVertexOutput
+//#import bevy_sprite::mesh2d_vertex_output::VertexOutput
 
 #import bevy_sprite::mesh2d_view_bindings as view_bindings
-#import bevy_sprite::mesh2d_bindings mesh
+#import bevy_sprite::mesh2d_bindings::mesh
 
-#import bevy_core_pipeline::tonemapping somewhat_boring_display_transform
+#import bevy_render::instance_index::get_instance_index
 
 const MATERIAL_FLAGS_TEXTURE_BIT: u32 = 1u;
 
@@ -37,8 +37,93 @@ fn rounded_box_sdf(center: vec2<f32>, size: vec2<f32>, radius: vec4<f32>) -> f32
     return min(max(q.x, q.y), 0.0) + length(max(q, vec2(0.0))) - r.x;
 }
 
+// ------------------------------
+// ------------------------------
+// ------------------------------
+// in bevy 0.12 mesh2d_vertex_output::VertexOutput is missing the instance index
+// copied from https://github.com/bevyengine/bevy/blob/32a5c7db3535250c43738e3da5877497b1274960/crates/bevy_sprite/src/mesh2d/mesh2d.wgsl#L31
+
+struct VertexOutput {
+    // this is `clip position` when the struct is used as a vertex stage output 
+    // and `frag coord` when used as a fragment stage input
+    @builtin(position) position: vec4<f32>,
+    @location(0) world_position: vec4<f32>,
+    @location(1) world_normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
+#ifdef VERTEX_TANGENTS
+    @location(3) world_tangent: vec4<f32>,
+#endif
+#ifdef VERTEX_COLORS
+    @location(4) color: vec4<f32>,
+#endif
+    @location(5) @interpolate(flat) instance_index: u32,
+}
+
+#import bevy_sprite::{
+    mesh2d_functions as mesh_functions,
+    mesh2d_view_bindings::view,
+}
+
+struct Vertex {
+    @builtin(instance_index) instance_index: u32,
+#ifdef VERTEX_POSITIONS
+    @location(0) position: vec3<f32>,
+#endif
+#ifdef VERTEX_NORMALS
+    @location(1) normal: vec3<f32>,
+#endif
+#ifdef VERTEX_UVS
+    @location(2) uv: vec2<f32>,
+#endif
+#ifdef VERTEX_TANGENTS
+    @location(3) tangent: vec4<f32>,
+#endif
+#ifdef VERTEX_COLORS
+    @location(4) color: vec4<f32>,
+#endif
+};
+
+@vertex
+fn vertex(vertex: Vertex) -> VertexOutput {
+    var out: VertexOutput;
+#ifdef VERTEX_UVS
+    out.uv = vertex.uv;
+#endif
+
+#ifdef VERTEX_POSITIONS
+    var model = mesh_functions::get_model_matrix(vertex.instance_index);
+    out.world_position = mesh_functions::mesh2d_position_local_to_world(
+        model,
+        vec4<f32>(vertex.position, 1.0)
+    );
+    out.position = mesh_functions::mesh2d_position_world_to_clip(out.world_position);
+#endif
+
+#ifdef VERTEX_NORMALS
+    out.world_normal = mesh_functions::mesh2d_normal_local_to_world(vertex.normal, vertex.instance_index);
+#endif
+
+#ifdef VERTEX_TANGENTS
+    out.world_tangent = mesh_functions::mesh2d_tangent_local_to_world(
+        model,
+        vertex.tangent
+    );
+#endif
+
+#ifdef VERTEX_COLORS
+    out.color = vertex.color;
+#endif
+
+    out.instance_index = get_instance_index(vertex.instance_index);
+    return out;
+}
+
+// ------------------------------
+// ------------------------------
+// ------------------------------
+
 @fragment
-fn fragment(in: MeshVertexOutput) -> @location(0) vec4<f32> {
+fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     var border_thickness = m.border_thickness;
 
     let bg_uv = (m.background_mat * vec4(in.uv - 0.5, 0.0, 1.0)).xy + 0.5;
@@ -51,10 +136,12 @@ fn fragment(in: MeshVertexOutput) -> @location(0) vec4<f32> {
     // Softening the border makes it larger, compensate for that
     border_thickness = max(border_thickness - m.border_softness, 0.0);
 
-    let scaleX = length(mesh.model[0].xyz);
-    let scaleY = length(mesh.model[1].xyz);
-    let right = length(normalize(mesh.model[0].xyz));
-    let up = length(normalize(mesh.model[1].xyz));
+    let model = mesh[get_instance_index(in.instance_index)].model;
+
+    let scaleX = length(model[0].xyz);
+    let scaleY = length(model[1].xyz);
+    let right = length(normalize(model[0].xyz));
+    let up = length(normalize(model[1].xyz));
 
     // mesh is 1x1 so the x and y scale is the full size of the rect
     let size = vec2(scaleX / right, scaleY / up); 

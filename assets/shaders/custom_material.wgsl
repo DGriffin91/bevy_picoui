@@ -1,9 +1,9 @@
 
-#import bevy_sprite::mesh2d_vertex_output  MeshVertexOutput
+#import bevy_sprite::mesh2d_vertex_output::VertexOutput
 
 #import bevy_sprite::mesh2d_view_bindings as view_bindings
 
-#import bevy_core_pipeline::tonemapping somewhat_boring_display_transform
+#import bevy_core_pipeline::tonemapping::somewhat_boring_display_transform
 
 fn modf(x: vec2<f32>, y: vec2<f32>) -> vec2<f32> {
     return x - y * floor(x/y);
@@ -14,7 +14,7 @@ fn modf(x: vec2<f32>, y: vec2<f32>) -> vec2<f32> {
 
 @fragment
 fn fragment(
-    in: MeshVertexOutput,
+    in: VertexOutput,
 ) -> @location(0) vec4<f32> {
     let fragCoord = in.position;
 

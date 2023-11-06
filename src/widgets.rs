@@ -136,7 +136,7 @@ pub fn drag_value(
                         //    // TODO user or auto precision
                         //    *s = format!("{:.2}", value);
                         //}
-                        for e in char_input_events.iter() {
+                        for e in char_input_events.read() {
                             if e.char == esc {
                                 reset = true;
                             } else if e.char == backspace {
@@ -371,7 +371,7 @@ impl ScrollAreaWidget {
                             };
                         }
                         if pico.hovered(&scroll_widget) {
-                            for event in mouse_wheel_events.iter() {
+                            for event in mouse_wheel_events.read() {
                                 scroll_position = (scroll_position
                                     + match event.unit {
                                         MouseScrollUnit::Line => -event.y,

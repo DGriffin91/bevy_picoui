@@ -3,7 +3,7 @@ use std::hash::Hasher;
 use bevy::{
     asset::load_internal_asset,
     prelude::*,
-    reflect::{TypePath, TypeUuid},
+    reflect::TypePath,
     render::{
         mesh::MeshVertexBufferLayout,
         render_resource::{
@@ -16,8 +16,7 @@ use bevy::{
 
 use crate::hash::hash_vec4;
 
-pub const RECTANGLE_MATERIAL_HANDLE: HandleUntyped =
-    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 98327450932847);
+pub const RECTANGLE_MATERIAL_HANDLE: Handle<Shader> = Handle::weak_from_u128(9832747364550932847);
 
 pub struct RectangleMaterialPlugin;
 
@@ -64,8 +63,7 @@ impl core::hash::Hash for RectangleMaterialUniform {
     }
 }
 
-#[derive(AsBindGroup, TypeUuid, TypePath, Debug, Clone, Hash, Default)]
-#[uuid = "56befa7d-4f01-4bf5-bd63-7b7b45ff5af6"]
+#[derive(Asset, TypePath, AsBindGroup, Debug, Clone, Default, Hash)]
 #[bind_group_data(RectangleMaterialKey)]
 pub struct RectangleMaterial {
     #[uniform(0)]
@@ -91,7 +89,11 @@ impl From<&RectangleMaterial> for RectangleMaterialKey {
 
 impl Material2d for RectangleMaterial {
     fn fragment_shader() -> ShaderRef {
-        RECTANGLE_MATERIAL_HANDLE.typed().into()
+        RECTANGLE_MATERIAL_HANDLE.into()
+    }
+    fn vertex_shader() -> ShaderRef {
+        // TODO in bevy 0.12 mesh2d_vertex_output::VertexOutput is missing the instance index. After this is fixed, swap back to default.
+        RECTANGLE_MATERIAL_HANDLE.into()
     }
 
     fn specialize(

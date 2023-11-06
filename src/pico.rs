@@ -4,7 +4,6 @@ use bevy::{
     prelude::*,
     render::render_resource::BlendState,
     sprite::{Anchor, Material2d},
-    text::DEFAULT_FONT_HANDLE,
     utils::{label::DynHash, HashMap},
 };
 use core::hash::Hash;
@@ -42,6 +41,7 @@ pub struct ItemStyle {
     pub border_color: Color,
     pub border_softness: Val,
     pub font_size: Val,
+    // If no font is specified, the default bevy font (a minimal subset of FiraMono) will be used.
     pub font: Handle<Font>,
     pub text_color: Color,
     pub background_color: Color,
@@ -74,7 +74,7 @@ impl Default for ItemStyle {
             border_color: Color::BLACK,
             border_softness: Val::Px(0.5),
             font_size: Val::Vh(2.0),
-            font: DEFAULT_FONT_HANDLE.typed(),
+            font: Default::default(),
             text_color: Color::WHITE,
             background_color: Color::NONE,
             background_gradient: (Color::NONE, Color::NONE),

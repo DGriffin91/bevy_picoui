@@ -1,9 +1,6 @@
-use std::time::Duration;
-
 use bevy::{
-    asset::ChangeWatcher,
     prelude::*,
-    reflect::{TypePath, TypeUuid},
+    reflect::TypePath,
     render::render_resource::{AsBindGroup, ShaderRef},
     sprite::{Anchor, Material2d, Material2dPlugin},
 };
@@ -17,12 +14,8 @@ use bevy_picoui::{
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
-        .add_plugins(DefaultPlugins.set(AssetPlugin {
-            // Make it so the shader can be hot reloaded.
-            watch_for_changes: ChangeWatcher::with_delay(Duration::from_millis(200)),
-            ..default()
-        }))
         .add_plugins((
+            DefaultPlugins,
             PicoPlugin::default(),
             Material2dPlugin::<CustomMaterial>::default(),
             PicoMaterialPlugin::<CustomMaterial>::default(),
@@ -80,8 +73,7 @@ fn update(
     });
 }
 
-#[derive(AsBindGroup, TypeUuid, TypePath, Debug, Clone)]
-#[uuid = "bcadcaba-77eb-48ad-84a0-6716d83bb6a0"]
+#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 struct CustomMaterial {}
 
 impl Material2d for CustomMaterial {
