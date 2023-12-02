@@ -5,7 +5,9 @@
 
 #import bevy_core_pipeline::tonemapping::somewhat_boring_display_transform
 
-fn modf(x: vec2<f32>, y: vec2<f32>) -> vec2<f32> {
+// Using the name modf doesn't work on WebGL
+// Internal error in ShaderStages(FRAGMENT) shader: ERROR: 0:92: 'modf' : Name of a built-in function cannot be redeclared as function
+fn mod_f(x: vec2<f32>, y: vec2<f32>) -> vec2<f32> {
     return x - y * floor(x/y);
 }
 
@@ -33,7 +35,7 @@ fn fragment(
         z += 0.07;
         l = length(p);
         uv = uv + p / l * (sin(z) + 1.0) * abs(sin(l * 9.0 - z - z));
-        c[i] = 0.01 / length(modf(uv, vec2(1.0)) - vec2(0.5));
+        c[i] = 0.01 / length(mod_f(uv, vec2(1.0)) - vec2(0.5));
     }
     c/=l;
     c = somewhat_boring_display_transform(c);
