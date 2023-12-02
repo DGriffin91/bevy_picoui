@@ -182,6 +182,7 @@ pub fn drag_value(
 // Basic example drag widget with label in horizontal layout
 // ---------------------------------------------------------
 
+#[allow(clippy::too_many_arguments)]
 pub fn basic_drag_widget(
     pico: &mut Pico,
     parent: ItemIndex,
@@ -263,7 +264,6 @@ impl ScrollAreaWidget {
         mouse_wheel_events: &mut EventReader<MouseWheel>,
     ) -> ScrollAreaWidget {
         let mut items = Vec::new();
-        let scroll_widget;
         let content_area;
         let scroll_bar_area;
         let up_btn;
@@ -275,7 +275,7 @@ impl ScrollAreaWidget {
         let mut scroll_updated = false;
         let mut fscroll_updated = false;
 
-        scroll_widget = pico.add(PicoItem {
+        let scroll_widget = pico.add(PicoItem {
             width: Val::Percent(100.0),
             height: Val::Percent(100.0),
             anchor: Anchor::TopLeft,
@@ -399,7 +399,7 @@ impl ScrollAreaWidget {
                         scroll_updated = true;
                     }
                     if pico.clicked(&down_btn) {
-                        scroll_position = (scroll_position + 1).min(scroll_range as i32);
+                        scroll_position = (scroll_position + 1).min(scroll_range);
                         scroll_updated = true;
                     }
                 }

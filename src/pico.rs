@@ -213,7 +213,7 @@ impl ProcessedPicoItem {
         self.life
     }
     pub fn get_anchor(&self) -> Anchor {
-        self.anchor.clone()
+        self.anchor
     }
     pub fn generate_id(&mut self) -> u64 {
         self.id = None;
@@ -310,14 +310,14 @@ impl PicoItem {
         parent: &Option<ItemIndex>,
     ) -> u64 {
         let hasher = &mut DefaultHasher::new();
-        hash_vec2(&uv_position, hasher);
-        hash_vec2(&uv_size, hasher);
+        hash_vec2(uv_position, hasher);
+        hash_vec2(uv_size, hasher);
         depth.to_bits().hash(hasher);
         if let Some(position_3d) = position_3d {
-            hash_vec3(&position_3d, hasher);
+            hash_vec3(position_3d, hasher);
         }
-        hash_anchor(&anchor, hasher);
-        hash_anchor(&anchor_text, hasher);
+        hash_anchor(anchor, hasher);
+        hash_anchor(anchor_text, hasher);
         parent.hash(hasher);
         hasher.finish()
     }

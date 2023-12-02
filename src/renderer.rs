@@ -158,7 +158,7 @@ pub fn render(
         } else {
             true
         };
-        let material = pico.get_rect_material(&item);
+        let material = pico.get_rect_material(item);
 
         if generate || pico.window_size != window_size {
             let size = item.get_uv_size() * window_size;
@@ -228,7 +228,7 @@ pub fn render(
 
                     builder.spawn(Text2dBundle {
                         text,
-                        text_anchor: item.style.anchor_text.clone(),
+                        text_anchor: item.style.anchor_text,
                         transform: Transform::from_translation(
                             (size * -(item_anchor_vec - item.style.anchor_text.as_vec()))
                                 .extend(0.0001)
@@ -252,12 +252,12 @@ pub fn render(
                     .spawn((
                         PicoEntity {
                             spatial_id,
-                            anchor: item.get_anchor().clone(),
+                            anchor: item.get_anchor(),
                             size,
                         },
                         Text2dBundle {
                             text,
-                            text_anchor: item.style.anchor_text.clone(),
+                            text_anchor: item.style.anchor_text,
                             transform: Transform::from_translation(*item_pos),
                             ..default()
                         },

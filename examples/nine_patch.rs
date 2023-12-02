@@ -83,7 +83,7 @@ fn update(
         height: Val::Vh(50.0),
         anchor: Anchor::Center,
         style: ItemStyle {
-            /// For image to be fully opaque with the correct colors, the background needs to be white.
+            // For image to be fully opaque with the correct colors, the background needs to be white.
             background_color: Color::WHITE,
             nine_patch: Some(nine_patch.blue_panel.0),
             image: Some(nine_patch.blue_panel.1.clone_weak()),

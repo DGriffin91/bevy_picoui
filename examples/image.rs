@@ -56,7 +56,7 @@ fn update(
         width: Val::Percent(80.0),
         height: Val::Percent(80.0),
         style: ItemStyle {
-            /// For image to be fully opaque with the correct colors, the background needs to be white.
+            // For image to be fully opaque with the correct colors, the background needs to be white.
             background_color: Color::WHITE,
             image: Some(image.clone()),
             edge_softness: Val::Percent(25.0),
