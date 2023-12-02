@@ -115,6 +115,12 @@ fn vertex(vertex: Vertex) -> VertexOutput {
 #endif
 
     out.instance_index = get_instance_index(vertex.instance_index);
+#ifdef BASE_INSTANCE_WORKAROUND
+    // Hack: this ensures the push constant is always used, which works around this issue:
+    // https://github.com/bevyengine/bevy/issues/10509
+    // This can be removed when wgpu 0.19 is released
+    out.position.x += min(f32(get_instance_index(0u)), 0.0);
+#endif
     return out;
 }
 
@@ -136,7 +142,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     // Softening the border makes it larger, compensate for that
     border_thickness = max(border_thickness - m.border_softness, 0.0);
 
-    let model = mesh[get_instance_index(in.instance_index)].model;
+    let model = mesh[in.instance_index].model;
 
     let scaleX = length(model[0].xyz);
     let scaleY = length(model[1].xyz);
