@@ -18,7 +18,7 @@ pub fn button(pico: &mut Pico, item: PicoItem) -> ItemIndex {
     let index = pico.add(item);
     let c = pico.get(&index).style.background_color;
     pico.get_mut(&index).style.background_color = if pico.hovered(&index) {
-        c + Vec4::splat(0.06)
+        c + Color::rgba(0.06, 0.06, 0.06, 0.0)
     } else {
         c
     };
@@ -44,7 +44,7 @@ pub fn toggle_button(
         c = enabled_bg;
     }
     pico.get_mut(&index).style.background_color = if pico.hovered(&index) {
-        c + Vec4::splat(0.08)
+        c + Color::rgb(0.08, 0.08, 0.08)
     } else {
         c
     };
@@ -137,15 +137,16 @@ pub fn drag_value(
                         //    *s = format!("{:.2}", value);
                         //}
                         for e in char_input_events.read() {
-                            if e.char == esc {
+                            let char = e.char.chars().next().unwrap();
+                            if char == esc {
                                 reset = true;
-                            } else if e.char == backspace {
+                            } else if char == backspace {
                                 s.pop();
-                            } else if e.char == enter {
+                            } else if char == enter {
                                 apply = true;
                                 break;
-                            } else if e.char.is_ascii_digit() || e.char == '.' || e.char == '-' {
-                                s.push(e.char);
+                            } else if char.is_ascii_digit() || char == '.' || char == '-' {
+                                s.push(char);
                             }
                         }
                         current_string = Some(s.clone());
@@ -167,11 +168,11 @@ pub fn drag_value(
             pico.get_mut(&drag_index).text = current_string + "|";
         }
         if selected {
-            drag_bg += Vec4::splat(0.25);
+            drag_bg = drag_bg + Color::rgba(0.25, 0.25, 0.25, 0.0);
         }
     }
     pico.get_mut(&drag_index).style.background_color = if pico.hovered(&drag_index) || dragging {
-        drag_bg + Vec4::splat(0.06)
+        drag_bg + Color::rgba(0.06, 0.06, 0.06, 0.0)
     } else {
         drag_bg
     };

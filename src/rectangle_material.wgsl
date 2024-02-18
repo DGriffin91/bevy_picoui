@@ -21,11 +21,11 @@ struct CustomMaterial {
     flags: u32,
 };
 
-@group(1) @binding(0)
+@group(2) @binding(0)
 var<uniform> m: CustomMaterial;
-@group(1) @binding(1)
+@group(2) @binding(1)
 var texture: texture_2d<f32>;
-@group(1) @binding(2)
+@group(2) @binding(2)
 var texture_sampler: sampler;
 
 
@@ -114,13 +114,7 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     out.color = vertex.color;
 #endif
 
-    out.instance_index = get_instance_index(vertex.instance_index);
-#ifdef BASE_INSTANCE_WORKAROUND
-    // Hack: this ensures the push constant is always used, which works around this issue:
-    // https://github.com/bevyengine/bevy/issues/10509
-    // This can be removed when wgpu 0.19 is released
-    out.position.x += min(f32(get_instance_index(0u)), 0.0);
-#endif
+    out.instance_index = vertex.instance_index;
     return out;
 }
 

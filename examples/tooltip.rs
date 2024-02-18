@@ -105,7 +105,7 @@ fn update(mut pico: ResMut<Pico>, windows: Query<&Window>) {
                                     text: format!("{:#?}", color),
                                     anchor_parent: Anchor::Center,
                                     style: ItemStyle {
-                                        text_alignment: TextAlignment::Left,
+                                        justify: JustifyText::Left,
                                         text_color: Color::BLACK,
                                         ..default()
                                     },

@@ -34,7 +34,7 @@ pub fn render(
     windows: Query<&Window>,
     mut pico: ResMut<Pico>,
     mut pico_entites: Query<(Entity, &mut Transform, &PicoEntity)>,
-    mouse_button_input: Res<Input<MouseButton>>,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
     mut currently_dragging: Local<bool>,
 ) {
     let Ok((camera, camera_transform)) = camera.get_single() else {
@@ -183,7 +183,7 @@ pub fn render(
                         font: item.style.font.clone(),
                     },
                 )],
-                alignment: item.style.text_alignment,
+                justify: item.style.justify,
                 linebreak_behavior: BreakLineOn::WordBoundary,
             };
             state_item.life = item.get_life();

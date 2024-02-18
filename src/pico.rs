@@ -52,7 +52,7 @@ pub struct ItemStyle {
     pub render_transform: Transform,
     pub edge_softness: Val,
     pub anchor_text: Anchor,
-    pub text_alignment: TextAlignment,
+    pub justify: JustifyText,
     pub material: Option<Entity>,
     /// For image to be fully opaque with the correct colors, the background needs to be white.
     pub image: Option<Handle<Image>>,
@@ -81,7 +81,7 @@ impl Default for ItemStyle {
             edge_softness: Val::Px(1.0),
             background_uv_transform: Transform::default(),
             render_transform: Transform::default(),
-            text_alignment: TextAlignment::Center,
+            justify: JustifyText::Center,
             anchor_text: Anchor::Center,
             material: None,
             image: None,
@@ -149,7 +149,7 @@ impl Hash for ItemStyle {
             hash_vec4(&mat.w_axis, state);
         }
         hash_val(&self.edge_softness, state);
-        self.text_alignment.hash(state);
+        self.justify.hash(state);
         hash_anchor(&self.anchor_text, state);
         if let Some(entity) = self.material {
             entity.hash(state);
@@ -332,7 +332,7 @@ pub struct StateItem {
     pub selected: bool,
     pub drag: Option<Drag>,
     pub id: u64,
-    pub input: Option<Input<MouseButton>>,
+    pub input: Option<ButtonInput<MouseButton>>,
     // Coordinates are uv space 0..1 over the whole window
     pub bbox: Vec4,
     pub storage: Option<Box<dyn std::any::Any + Send + Sync>>,
@@ -365,7 +365,7 @@ pub struct Pico {
     pub stack_stack: Vec<Stack>,
     pub stack_guard: Guard,
     pub window_size: Vec2,
-    pub mouse_button_input: Option<Input<MouseButton>>,
+    pub mouse_button_input: Option<ButtonInput<MouseButton>>,
     pub internal_auto_depth: f32,
 }
 

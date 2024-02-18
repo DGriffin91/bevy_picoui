@@ -1,8 +1,6 @@
 use bevy::{
-    core_pipeline::clear_color::ClearColorConfig,
     ecs::system::Command,
     input::InputSystem,
-    math::vec2,
     prelude::*,
     sprite::{Material2d, Mesh2dHandle},
 };
@@ -50,7 +48,7 @@ pub struct MeshHandles {
 }
 
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
-    let rect: Mesh2dHandle = meshes.add(shape::Quad::new(vec2(1.0, 1.0)).into()).into();
+    let rect: Mesh2dHandle = meshes.add(Rectangle::new(1.0, 1.0)).into();
     commands.insert_resource(MeshHandles { rect: rect.0 });
 }
 
@@ -58,10 +56,8 @@ fn setup_2d_camera(mut commands: Commands, order: Res<CreateDefaultCamWithOrder>
     commands.spawn(Camera2dBundle {
         camera: Camera {
             order: order.0,
-            ..default()
-        },
-        camera_2d: Camera2d {
             clear_color: ClearColorConfig::None,
+            ..default()
         },
         ..default()
     });

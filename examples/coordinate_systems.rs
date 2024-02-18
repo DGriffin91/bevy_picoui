@@ -27,10 +27,6 @@ fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
         .add_plugins(DefaultPlugins)
-        .insert_resource(GizmoConfig {
-            render_layers: RenderLayers::layer(1),
-            ..default()
-        })
         .add_plugins((
             CameraControllerPlugin,
             CoordinateTransformationsPlugin,
@@ -48,18 +44,24 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
+    mut gizmo_config: ResMut<GizmoConfigStore>,
 ) {
+    gizmo_config
+        .config_mut::<DefaultGizmoConfigGroup>()
+        .0
+        .render_layers = RenderLayers::layer(1);
+
     // plane
     commands.spawn(PbrBundle {
-        mesh: meshes.add(shape::Plane::from_size(5.0).into()),
-        material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
+        mesh: meshes.add(Plane3d::default().mesh().size(5.0, 5.0)),
+        material: materials.add(Color::rgb(0.3, 0.5, 0.3)),
         ..default()
     });
 
     // cube
     commands.spawn(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-        material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
+        mesh: meshes.add(Cuboid::default()),
+        material: materials.add(Color::rgb(0.8, 0.7, 0.6)),
         transform: Transform::from_xyz(0.0, 0.5, 0.0),
         ..default()
     });
@@ -67,7 +69,7 @@ fn setup(
     // light
     commands.spawn(PointLightBundle {
         point_light: PointLight {
-            intensity: 1500.0,
+            intensity: 1500.0 * 1000.0,
             shadows_enabled: true,
             ..default()
         },
@@ -139,7 +141,7 @@ fn setup(
             // Post processing 2d quad, with material using the render texture done by the main camera, with a custom shader.
             builder.spawn((
                 PbrBundle {
-                    mesh: meshes.add(Mesh::from(shape::Quad::new(Vec2::new(
+                    mesh: meshes.add(Rectangle::new(
                         /*
                         Taken from below since we don't View yet.
                         dbg!(
@@ -148,7 +150,7 @@ fn setup(
                         );
                         */
                         1.4727595, 0.82842755,
-                    )))),
+                    )),
                     material: materials.add(StandardMaterial {
                         base_color_texture: Some(image_h),
                         unlit: true,
@@ -187,7 +189,7 @@ fn update(
         anchor: Anchor::BottomRight,
         style: ItemStyle {
             anchor_text: Anchor::BottomRight,
-            text_alignment: TextAlignment::Right,
+            justify: JustifyText::Right,
             background_color: Color::rgba(0.0, 0.0, 0.0, 0.3),
             ..default()
         },
@@ -209,7 +211,7 @@ fn update(
         height: Val::Vh(100.0),
         anchor: Anchor::TopLeft,
         style: ItemStyle {
-            text_alignment: TextAlignment::Left,
+            justify: JustifyText::Left,
             background_color: Color::rgba(0.2, 0.2, 0.2, 0.2),
             ..default()
         },
